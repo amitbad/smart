@@ -39,14 +39,14 @@ export default function Layout({ children, user, onLogout }) {
           </Link>
 
           <Link
-            to="/tables"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/tables')
+            to="/members"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/members') || location.pathname.startsWith('/members')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
               }`}
           >
             <Table size={16} className="flex-shrink-0" />
-            {!sidebarCollapsed && <span>Tables</span>}
+            {!sidebarCollapsed && <span>Members</span>}
           </Link>
 
           <Link

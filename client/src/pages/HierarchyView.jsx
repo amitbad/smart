@@ -4,47 +4,47 @@ import HierarchyNode from '../components/HierarchyNode';
 import axios from 'axios';
 
 export default function HierarchyView() {
-  const [employees, setEmployees] = useState([]);
+  const [members, setMembers] = useState([]);
   const [hierarchyData, setHierarchyData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandAll, setExpandAll] = useState(false);
 
   useEffect(() => {
-    fetchEmployees();
+    fetchMembers();
   }, []);
 
-  const fetchEmployees = async () => {
+  const fetchMembers = async () => {
     try {
-      const response = await axios.get('/api/employees');
-      setEmployees(response.data);
-      buildHierarchy(response.data);
+      const response = await axios.get('/api/members?limit=1000');
+      setMembers(response.data.data || []);
+      buildHierarchy(response.data.data || []);
       setLoading(false);
     } catch (error) {
-      console.error('Error fetching employees:', error);
+      console.error('Error fetching members:', error);
       setLoading(false);
     }
   };
 
   const buildHierarchy = (data) => {
-    const employeeMap = {};
-    data.forEach((emp) => {
-      employeeMap[emp.id] = { ...emp, reportees: [] };
+    const memberMap = {};
+    data.forEach((member) => {
+      memberMap[member.id] = { ...member, reportees: [] };
     });
 
     let root = null;
-    data.forEach((emp) => {
-      if (emp.manager_id === null) {
-        root = employeeMap[emp.id];
-      } else if (employeeMap[emp.manager_id]) {
-        employeeMap[emp.manager_id].reportees.push(employeeMap[emp.id]);
+    data.forEach((member) => {
+      if (member.manager_id === null) {
+        root = memberMap[member.id];
+      } else if (memberMap[member.manager_id]) {
+        memberMap[member.manager_id].reportees.push(memberMap[member.id]);
       }
     });
 
     setHierarchyData(root);
   };
 
-  const handleNodeClick = (employee) => {
-    console.log('Clicked employee:', employee);
+  const handleNodeClick = (member) => {
+    console.log('Clicked member:', member);
   };
 
   if (loading) {
