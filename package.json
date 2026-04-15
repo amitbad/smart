@@ -1,0 +1,27 @@
+{
+  "name": "smart-personal-organizer",
+  "version": "1.0.0",
+  "description": "Smart Personal Organizer - Hierarchical data management tool",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev",
+    "build": "cd client && npm run build",
+    "db:migrate": "node server/scripts/migrate-safe.js",
+    "db:migrate:unsafe": "node server/scripts/migrate.js",
+    "db:seed": "node server/scripts/seed.js",
+    "db:seed:users": "node server/scripts/seed-users.js"
+  },
+  "keywords": [
+    "organizer",
+    "hierarchy",
+    "postgresql",
+    "react"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

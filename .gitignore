@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IMPORTANT: server/migrations/ folder is intentionally NOT ignored
+# It contains database migration history and must be version controlled
+
+# Build outputs
+dist/
+build/
+client/dist/
+client/build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS files
+Thumbs.db
