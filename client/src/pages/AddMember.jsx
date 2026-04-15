@@ -8,7 +8,7 @@ import Dialog from '../components/Dialog';
 export default function AddMember() {
   const navigate = useNavigate();
   const toast = useToast();
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -16,9 +16,11 @@ export default function AddMember() {
     level: '',
     manager_id: ''
   });
-  
+
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [availableSkills, setAvailableSkills] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  const [designationInput, setDesignationInput] = useState('');
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showSkillDialog, setShowSkillDialog] = useState(false);
@@ -27,6 +29,7 @@ export default function AddMember() {
   useEffect(() => {
     fetchSkills();
     fetchManagers();
+    fetchDesignations();
   }, []);
 
   const fetchSkills = async () => {
@@ -35,6 +38,15 @@ export default function AddMember() {
       setAvailableSkills(response.data);
     } catch (error) {
       toast.error('Failed to load skills');
+    }
+  };
+
+  const fetchDesignations = async () => {
+    try {
+      const res = await axios.get('/api/designations');
+      setDesignations(res.data || []);
+    } catch (e) {
+      // silent fail, still allow manual entry
     }
   };
 
@@ -80,7 +92,7 @@ export default function AddMember() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.email) {
       toast.error('Name and email are required');
       return;
@@ -91,7 +103,7 @@ export default function AddMember() {
     try {
       await axios.post('/api/members', {
         ...formData,
-        level: formData.level ? parseInt(formData.level) : null,
+        level: formData.level || null,
         manager_id: formData.manager_id || null,
         skills: selectedSkills
       });
@@ -157,25 +169,69 @@ export default function AddMember() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Designation</label>
-                <input
-                  type="text"
-                  name="designation"
-                  value={formData.designation}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
-                />
+                {designations.length > 0 ? (
+                  <div className="flex gap-2">
+                    <select
+                      name="designation"
+                      value={formData.designation}
+                      onChange={handleChange}
+                      className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                    >
+                      <option value="">Select designation</option>
+                      {designations.map(d => (
+                        <option key={d.id} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    name="designation"
+                    value={formData.designation}
+                    onChange={handleChange}
+                    className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                  />
+                )}
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={designationInput}
+                    onChange={(e) => setDesignationInput(e.target.value)}
+                    placeholder="Add new designation"
+                    className="flex-1 bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const name = designationInput.trim();
+                      if (!name) return;
+                      try {
+                        const resp = await axios.post('/api/designations', { name });
+                        setDesignations(prev => {
+                          const exists = prev.some(d => d.name.toLowerCase() === resp.data.name.toLowerCase());
+                          return exists ? prev : [...prev, resp.data].sort((a, b) => a.name.localeCompare(b.name));
+                        });
+                        setFormData(prev => ({ ...prev, designation: resp.data.name }));
+                        setDesignationInput('');
+                        toast.success('Designation added');
+                      } catch (err) {
+                        toast.error(err.response?.data?.error || 'Failed to add designation');
+                      }
+                    }}
+                    className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm"
+                  >Add</button>
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">Level</label>
                 <input
-                  type="number"
+                  type="text"
                   name="level"
                   value={formData.level}
                   onChange={handleChange}
-                  min="1"
-                  max="10"
                   className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                  placeholder="e.g., A1, A2, 3, 10"
                 />
               </div>
 

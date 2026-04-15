@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import memberRoutes from './routes/members.js';
 import skillRoutes from './routes/skills.js';
+import designationRoutes from './routes/designations.js';
 import authRoutes from './routes/auth.js';
 
 dotenv.config();
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/members', memberRoutes);
 app.use('/api/skills', skillRoutes);
+app.use('/api/designations', designationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Smart API is running' });
