@@ -4,7 +4,8 @@
   "description": "Smart Personal Organizer - Hierarchical data management tool",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "concurrently -k -c \"magenta.bold,cyan.bold\" -n \"server,client\" --prefix \"[{time}] [{name}]\" \"npm:server\" \"npm:client\"",
+    "dev:verbose": "concurrently -k -c \"magenta.bold,cyan.bold\" -n \"server,client\" --prefix \"[{time}] [{name}]\" \"npm:server\" \"npm:client\"",
     "client": "cd client && npm run dev",
     "server": "cd server && npm run dev",
     "build": "cd client && npm run build",
