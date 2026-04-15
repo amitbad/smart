@@ -6,21 +6,10 @@ Follow these steps **in order** to get your application running.
 
 ## ✅ Step 1: Install Dependencies
 
-Run these commands from the project root directory:
+From the project root directory, run a single command:
 
 ```bash
-# Install root dependencies
-npm install
-
-# Install server dependencies
-cd server
-npm install
-cd ..
-
-# Install client dependencies
-cd client
-npm install
-cd ..
+npm run install-all
 ```
 
 **What this does:** Installs all required Node.js packages including React, Express, PostgreSQL driver, bcrypt for password hashing, etc.
@@ -29,42 +18,45 @@ cd ..
 
 ## ✅ Step 2: Setup PostgreSQL Database
 
-### Option A: Using Command Line
+### Option A: Using Docker (Quickest)
 
 ```bash
-# Connect to PostgreSQL
-psql -U postgres
+# Remove any old container (ignore errors if it doesn't exist)
+docker rm -f smart-postgres 2>/dev/null || true
 
-# Run these commands in psql:
-CREATE DATABASE smart_organizer;
-CREATE USER demo WITH PASSWORD 'demo';
-GRANT ALL PRIVILEGES ON DATABASE smart_organizer TO demo;
-\q
+# Start PostgreSQL 16 mapped to host port 5533
+docker run -d --name smart-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgress \
+  -e POSTGRES_DB=smart_organizer \
+  -p 5533:5432 \
+  -v pgdata_smart:/var/lib/postgresql/data \
+  postgres:16
+
+# (Optional) verify
+docker ps
+docker logs smart-postgres | tail -n 50
 ```
 
 ### Option B: Using GUI (pgAdmin, DBeaver, etc.)
 
 1. Open your PostgreSQL GUI tool
 2. Create a new database named: `smart_organizer`
-3. Create a new user: username `demo`, password `demo`
-4. Grant all privileges on the database to the user
 
-**What this does:** Creates the database and user account that the application will use.
+**Note:** The app now defaults to the built-in `postgres` user. Creating a custom DB user is optional.
 
 ---
 
 ## ✅ Step 3: Configure Environment Variables
 
-The `.env` file is already created with default settings. **You can skip this step** if you're using the default `demo/demo` credentials.
-
-If you want to use different credentials, edit `.env`:
+Create `server/.env` or copy from `.env.example`. Defaults are set for the Docker setup above:
 
 ```bash
 DB_HOST=localhost
-DB_PORT=5432
+DB_PORT=5533
 DB_NAME=smart_organizer
-DB_USER=your_username      # Change this
-DB_PASSWORD=your_password  # Change this
+DB_USER=postgres
+DB_PASSWORD=postgress
 ```
 
 **What this does:** Tells the application how to connect to your database.
@@ -73,42 +65,21 @@ DB_PASSWORD=your_password  # Change this
 
 ## ✅ Step 4: Run Database Migrations
 
-This creates the tables in your database:
+This creates or updates all required tables safely (tracked by `schema_migrations`):
 
 ```bash
-cd server
-node scripts/migrate.js
+# From project root
+npm run db:migrate
 ```
 
-**Expected Output:**
-```
-🚀 Starting database migration...
-
-📋 Creating table: employees
-   ✓ Dropped existing table (if any)
-   ✓ Table created successfully
-   ✓ Index created: idx_employees_manager_id
-   ✓ Index created: idx_employees_level
-
-📋 Creating table: users
-   ✓ Dropped existing table (if any)
-   ✓ Table created successfully
-   ✓ Index created: idx_users_username
-
-✅ Migration completed successfully!
-```
-
-**What this does:** Creates the `employees` and `users` tables based on the schema defined in `server/config/schema.json`.
+**What this does:** Creates/updates `members`, `users`, `skills`, `member_skills`, and `schema_migrations` tables using the safe migration runner.
 
 ---
 
-## ✅ Step 5: Seed Sample Data
-
-### 5a. Create Admin User (Required)
+## ✅ Step 5: Seed Admin User (Required)
 
 ```bash
-# Still in server directory
-node scripts/seed-users.js
+npm run db:seed:users
 ```
 
 **Expected Output:**
@@ -123,16 +94,7 @@ node scripts/seed-users.js
 ✅ User seeding completed!
 ```
 
-**What this does:** Creates the admin user account so you can log in.
-
-### 5b. Seed Employee Data (Optional but Recommended)
-
-```bash
-node scripts/seed.js
-cd ..
-```
-
-**What this does:** Adds sample organizational hierarchy data for testing.
+**What this does:** Creates the admin user account so you can log in. No member data is seeded; add members manually via the UI.
 
 ---
 
@@ -172,7 +134,7 @@ npm run dev
 After logging in, you can:
 
 - **View Hierarchy:** See the organizational chart with expandable nodes
-- **View Tables:** Browse all employees in a data table
+- **Members:** Browse all members in a data grid (search, filter, pagination)
 - **Change Password:** Update your password (recommended!)
 - **Settings:** Configure application settings
 - **Logout:** Sign out of the application
@@ -192,11 +154,9 @@ After logging in, you can:
 - **Role:** ADMIN
 
 ### Important Files
-- **Database Schema:** `server/config/schema.json`
-- **Environment Config:** `.env`
-- **Migration Script:** `server/scripts/migrate.js`
+- **Environment Config:** `server/.env`
+- **Migrations:** `server/migrations/` and `server/scripts/migrate-safe.js`
 - **User Seed:** `server/scripts/seed-users.js`
-- **Employee Seed:** `server/scripts/seed.js`
 
 ---
 
@@ -237,34 +197,35 @@ PORT=3002
 
 ### Issue: Migration fails with permission error
 
-**Solution:**
-```bash
-# Grant proper permissions
-psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE smart_organizer TO demo;"
-```
+**Solution:** Ensure your `server/.env` matches your running DB (host/port/user/password). If using Docker command above, postgres/postgress on port 5533 will work.
 
 ---
 
-## 🔄 Reset Everything
+## 🔄 Reset Everything (Docker)
 
 If you need to start fresh:
 
 ```bash
 # 1. Stop the application (Ctrl+C)
 
-# 2. Drop and recreate database
-psql -U postgres -c "DROP DATABASE IF EXISTS smart_organizer;"
-psql -U postgres -c "CREATE DATABASE smart_organizer;"
-psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE smart_organizer TO demo;"
+# 2. Reset container and volume
+docker rm -f smart-postgres
+docker volume rm pgdata_smart 2>/dev/null || true
 
-# 3. Run migrations again
-cd server
-node scripts/migrate.js
-node scripts/seed-users.js
-node scripts/seed.js
-cd ..
+# 3. Recreate DB quickly on port 5533
+docker run -d --name smart-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgress \
+  -e POSTGRES_DB=smart_organizer \
+  -p 5533:5432 \
+  -v pgdata_smart:/var/lib/postgresql/data \
+  postgres:16
 
-# 4. Restart application
+# 4. Run migrations again
+npm run db:migrate
+npm run db:seed:users
+
+# 5. Restart application
 npm run dev
 ```
 
