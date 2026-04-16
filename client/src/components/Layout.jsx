@@ -1,10 +1,26 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell } from 'lucide-react';
+import axios from 'axios';
 
 export default function Layout({ children, user, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const [todayCount, setTodayCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await axios.get('/api/action-items', { params: { date: today } });
+        setTodayCount(Array.isArray(res.data) ? res.data.length : 0);
+      } catch {
+        setTodayCount(0);
+      }
+    };
+    fetchCount();
+  }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path;
 
@@ -141,6 +157,14 @@ export default function Layout({ children, user, onLogout }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden bg-gray-950">
+        <div className="h-12 flex items-center justify-end px-4 border-b border-gray-800 bg-black">
+          <button onClick={() => navigate('/action-items')} className="relative p-2 rounded hover:bg-gray-900 text-gray-300" title="Today's Action Items">
+            <Bell size={18} />
+            {todayCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] leading-none px-1.5 py-0.5 rounded-full">{todayCount}</span>
+            )}
+          </button>
+        </div>
         {children}
       </main>
     </div>

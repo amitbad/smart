@@ -6,7 +6,7 @@ const router = express.Router();
 // List emails with filters
 router.get('/', async (req, res) => {
   try {
-    const { date, priority, status, sender } = req.query;
+    const { date, priority, status, sender, reply_by } = req.query;
     const params = [];
     let idx = 1;
     let where = 'WHERE 1=1';
@@ -15,6 +15,7 @@ router.get('/', async (req, res) => {
     if (priority) { where += ` AND priority = $${idx++}`; params.push(priority); }
     if (status) { where += ` AND status = $${idx++}`; params.push(status); }
     if (sender) { where += ` AND sender ILIKE $${idx++}`; params.push(`%${sender}%`); }
+    if (reply_by) { where += ` AND reply_by = $${idx++}`; params.push(reply_by); }
 
     const result = await pool.query(
       `SELECT * FROM emails ${where} ORDER BY received_at DESC, created_at DESC`,

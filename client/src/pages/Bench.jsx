@@ -71,6 +71,24 @@ export default function Bench() {
 
   const handleSave = async () => {
     if (!form.member_id || !form.assigned_date) { toast.error('Member and Assigned Date are required'); return; }
+    // Validate date ordering
+    const ad = form.assigned_date;
+    const rd = form.release_date;
+    const xd = showExtension ? form.extension_date : '';
+    if (rd && rd <= ad) {
+      toast.error('Release Date must be after Assigned Date');
+      return;
+    }
+    if (showExtension && xd) {
+      if (!rd) {
+        toast.error('Please set a Release Date before adding Extension Date');
+        return;
+      }
+      if (xd <= rd) {
+        toast.error('Extension Date must be after Release Date');
+        return;
+      }
+    }
     try {
       const payload = {
         member_id: parseInt(form.member_id, 10),
