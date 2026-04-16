@@ -39,4 +39,40 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Update a designation
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Designation name is required' });
+    }
+    const result = await pool.query(
+      'UPDATE designations SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name',
+      [name.trim(), id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(result.rows[0]);
+  } catch (error) {
+    if (error.code === '23505') {
+      return res.status(409).json({ error: 'Designation name must be unique' });
+    }
+    console.error('Error updating designation:', error);
+    res.status(500).json({ error: 'Failed to update designation' });
+  }
+});
+
+// Delete a designation
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const del = await pool.query('DELETE FROM designations WHERE id = $1', [id]);
+    if (del.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    res.json({ message: 'Deleted' });
+  } catch (error) {
+    console.error('Error deleting designation:', error);
+    res.status(500).json({ error: 'Failed to delete designation' });
+  }
+});
+
 export default router;

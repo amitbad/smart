@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, Network, Table, Settings, User, LogOut, Key } from 'lucide-react';
+import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase } from 'lucide-react';
 
 export default function Layout({ children, user, onLogout }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -36,6 +36,50 @@ export default function Layout({ children, user, onLogout }) {
           >
             <Network size={16} className="flex-shrink-0" />
             {!sidebarCollapsed && <span>Hierarchy</span>}
+          </Link>
+
+          <Link
+            to="/emails"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/emails')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <Mail size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Emails</span>}
+          </Link>
+
+          <Link
+            to="/bench"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/bench')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <Briefcase size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Bench</span>}
+          </Link>
+
+          <Link
+            to="/masters"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/masters')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <Layers size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Masters</span>}
+          </Link>
+
+          <Link
+            to="/action-items"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/action-items')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <ListTodo size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Action Items</span>}
           </Link>
 
           <Link

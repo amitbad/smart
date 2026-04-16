@@ -16,19 +16,19 @@ export default function Toast({ message, type = 'success', onClose, duration = 3
   };
 
   const bgColors = {
-    success: 'bg-green-600/20 border-green-600/50',
-    error: 'bg-red-600/20 border-red-600/50',
-    info: 'bg-blue-600/20 border-blue-600/50'
+    success: 'bg-gray-900 border-green-600',
+    error: 'bg-gray-900 border-red-600',
+    info: 'bg-gray-900 border-blue-600'
   };
 
   const textColors = {
-    success: 'text-green-400',
-    error: 'text-red-400',
-    info: 'text-blue-400'
+    success: 'text-gray-100',
+    error: 'text-gray-100',
+    info: 'text-gray-100'
   };
 
   return (
-    <div className={`${bgColors[type]} border rounded-lg p-4 shadow-lg flex items-start gap-3 min-w-[300px] max-w-[400px] animate-slide-in`}>
+    <div className={`${bgColors[type]} border rounded-lg p-4 shadow-xl flex items-start gap-3 min-w-[300px] max-w-[400px] animate-slide-in`}>
       <div className="flex-shrink-0 mt-0.5">
         {icons[type]}
       </div>

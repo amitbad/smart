@@ -22,6 +22,9 @@ export default function AddMember() {
   const [designations, setDesignations] = useState([]);
   const [designationInput, setDesignationInput] = useState('');
   const [managers, setManagers] = useState([]);
+  const [rmEnabled, setRmEnabled] = useState(false);
+  const [rmQuery, setRmQuery] = useState('');
+  const [rmOpen, setRmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSkillDialog, setShowSkillDialog] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
@@ -52,7 +55,7 @@ export default function AddMember() {
 
   const fetchManagers = async () => {
     try {
-      const response = await axios.get('/api/members');
+      const response = await axios.get('/api/members?limit=1000');
       setManagers(response.data.data || []);
     } catch (error) {
       toast.error('Failed to load managers');
@@ -104,7 +107,7 @@ export default function AddMember() {
       await axios.post('/api/members', {
         ...formData,
         level: formData.level || null,
-        manager_id: formData.manager_id || null,
+        manager_id: rmEnabled && formData.manager_id ? formData.manager_id : null,
         skills: selectedSkills
       });
 
@@ -236,20 +239,74 @@ export default function AddMember() {
               </div>
 
               <div className="col-span-2">
-                <label className="block text-sm font-medium mb-2">Manager</label>
-                <select
-                  name="manager_id"
-                  value={formData.manager_id}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
-                >
-                  <option value="">No Manager</option>
-                  {managers.map(manager => (
-                    <option key={manager.id} value={manager.id}>
-                      {manager.name} - {manager.designation || 'N/A'}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium">Resource Manager (RM)</label>
+                  <label className="text-xs flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rmEnabled}
+                      onChange={(e) => {
+                        setRmEnabled(e.target.checked);
+                        if (!e.target.checked) {
+                          setFormData(prev => ({ ...prev, manager_id: '' }));
+                          setRmQuery('');
+                          setRmOpen(false);
+                        }
+                      }}
+                      className="rounded border-gray-700 text-cyan-600 focus:ring-cyan-600"
+                    />
+                    Assign RM
+                  </label>
+                </div>
+                {rmEnabled && (
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={rmQuery}
+                      onChange={(e) => { setRmQuery(e.target.value); setRmOpen(true); }}
+                      onFocus={() => setRmOpen(true)}
+                      placeholder="Search and select Resource Manager"
+                      className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                    />
+                    {rmOpen && (
+                      <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded border border-gray-800 bg-black shadow-lg">
+                        <div className="py-1">
+                          {managers
+                            .filter(m => {
+                              const label = `${m.name}${m.designation ? ` (${m.designation})` : ''}`;
+                              const q = rmQuery.toLowerCase();
+                              return !q || label.toLowerCase().includes(q);
+                            })
+                            .slice(0, 100)
+                            .map(m => {
+                              const label = `${m.name}${m.designation ? ` (${m.designation})` : ''}`;
+                              return (
+                                <button
+                                  type="button"
+                                  key={m.id}
+                                  onClick={() => {
+                                    setFormData(prev => ({ ...prev, manager_id: m.id }));
+                                    setRmQuery(label);
+                                    setRmOpen(false);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-900 ${formData.manager_id === m.id ? 'bg-gray-900' : ''}`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          {managers.filter(m => {
+                            const label = `${m.name}${m.designation ? ` (${m.designation})` : ''}`;
+                            const q = rmQuery.toLowerCase();
+                            return !q || label.toLowerCase().includes(q);
+                          }).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-gray-500">No matches</div>
+                            )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="col-span-2">

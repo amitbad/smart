@@ -20,6 +20,7 @@ export default function Members() {
     totalPages: 0
   });
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, member: null });
+  const [rmConfirm, setRmConfirm] = useState({ isOpen: false, member: null, dependents: 0 });
 
   useEffect(() => {
     fetchMembers();
@@ -64,7 +65,24 @@ export default function Members() {
       toast.success('Member deleted successfully');
       fetchMembers();
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to delete member');
+      const status = error.response?.status;
+      if (status === 409) {
+        const dependents = error.response?.data?.dependents || 0;
+        setRmConfirm({ isOpen: true, member, dependents });
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to delete member');
+      }
+    }
+  };
+
+  const handleUnassignAndDelete = async (member) => {
+    try {
+      await axios.delete(`/api/members/${member.id}`, { params: { unassign: true } });
+      toast.success('Unassigned dependents and deleted member');
+      setRmConfirm({ isOpen: false, member: null, dependents: 0 });
+      fetchMembers();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to unassign and delete');
     }
   };
 
@@ -278,6 +296,17 @@ export default function Members() {
         confirmText="Delete"
         cancelText="Cancel"
         type="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={rmConfirm.isOpen}
+        onClose={() => setRmConfirm({ isOpen: false, member: null, dependents: 0 })}
+        onConfirm={() => handleUnassignAndDelete(rmConfirm.member)}
+        title="Unassign RM & Delete?"
+        message={`${rmConfirm.member?.name} is assigned as RM to ${rmConfirm.dependents} member(s). Do you want to unassign this RM from all associated members and delete this member?`}
+        confirmText="Unassign RM & Delete"
+        cancelText="Cancel"
+        type="warning"
       />
     </>
   );

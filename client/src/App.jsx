@@ -10,6 +10,10 @@ import AddMember from './pages/AddMember';
 import EditMember from './pages/EditMember';
 import ViewMember from './pages/ViewMember';
 import { ToastProvider } from './components/ToastContainer';
+import ActionItems from './pages/ActionItems';
+import Masters from './pages/Masters';
+import Emails from './pages/Emails';
+import Bench from './pages/Bench';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -63,6 +67,10 @@ function App() {
             <Route path="/members/add" element={<AddMember />} />
             <Route path="/members/:id" element={<ViewMember />} />
             <Route path="/members/:id/edit" element={<EditMember />} />
+            <Route path="/action-items" element={<ActionItems />} />
+            <Route path="/emails" element={<Emails />} />
+            <Route path="/bench" element={<Bench />} />
+            <Route path="/masters" element={<Masters />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/login" element={<Navigate to="/" replace />} />

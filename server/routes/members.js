@@ -290,18 +290,42 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM members WHERE id = $1 RETURNING *', [id]);
+    const unassign = (req.query.unassign || '').toString().toLowerCase() === 'true';
+
+    const depResult = await client.query('SELECT COUNT(*)::int AS cnt FROM members WHERE manager_id = $1', [id]);
+    const dependents = depResult.rows[0]?.cnt || 0;
+
+    if (dependents > 0 && !unassign) {
+      return res.status(409).json({
+        error: 'Member has associated records as Resource Manager',
+        dependents
+      });
+    }
+
+    await client.query('BEGIN');
+
+    if (dependents > 0 && unassign) {
+      await client.query('UPDATE members SET manager_id = NULL WHERE manager_id = $1', [id]);
+    }
+
+    const result = await client.query('DELETE FROM members WHERE id = $1 RETURNING *', [id]);
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Member not found' });
     }
 
-    res.json({ message: 'Member deleted successfully' });
+    await client.query('COMMIT');
+    res.json({ message: 'Member deleted successfully', unassigned: dependents });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error deleting member:', error);
     res.status(500).json({ error: 'Failed to delete member' });
+  } finally {
+    client.release();
   }
 });
 
