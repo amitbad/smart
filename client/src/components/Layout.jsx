@@ -8,18 +8,30 @@ export default function Layout({ children, user, onLogout }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [todayCount, setTodayCount] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [todayActions, setTodayActions] = useState([]);
+  const [todayEmails, setTodayEmails] = useState([]);
 
   useEffect(() => {
-    const fetchCount = async () => {
+    const fetchAll = async () => {
       try {
         const today = new Date().toISOString().slice(0, 10);
-        const res = await axios.get('/api/action-items', { params: { date: today } });
-        setTodayCount(Array.isArray(res.data) ? res.data.length : 0);
+        const [ai, em] = await Promise.all([
+          axios.get('/api/action-items', { params: { date: today } }),
+          axios.get('/api/emails', { params: { reply_by: today } })
+        ]);
+        const a = Array.isArray(ai.data) ? ai.data : [];
+        const e = Array.isArray(em.data) ? em.data : [];
+        setTodayActions(a);
+        setTodayEmails(e);
+        setTodayCount(a.length + e.length);
       } catch {
+        setTodayActions([]);
+        setTodayEmails([]);
         setTodayCount(0);
       }
     };
-    fetchCount();
+    fetchAll();
   }, [location.pathname]);
 
   const isActive = (path) => location.pathname === path;
@@ -157,13 +169,38 @@ export default function Layout({ children, user, onLogout }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden bg-gray-950">
-        <div className="h-12 flex items-center justify-end px-4 border-b border-gray-800 bg-black">
-          <button onClick={() => navigate('/action-items')} className="relative p-2 rounded hover:bg-gray-900 text-gray-300" title="Today's Action Items">
+        <div className="h-12 flex items-center justify-end px-4 border-b border-gray-800 bg-black relative">
+          <button onClick={() => setNotifOpen(v => !v)} className="relative p-2 rounded hover:bg-gray-900 text-gray-300" title="Today's Items">
             <Bell size={18} />
             {todayCount > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] leading-none px-1.5 py-0.5 rounded-full">{todayCount}</span>
             )}
           </button>
+          {notifOpen && (
+            <div className="absolute right-4 top-12 w-96 bg-black border border-gray-800 rounded shadow-lg z-20">
+              <div className="px-3 py-2 border-b border-gray-800 text-sm text-gray-400">Today's Overview</div>
+              <div className="max-h-80 overflow-auto">
+                <div className="px-3 py-2 text-xs text-gray-500">Emails to reply today</div>
+                {todayEmails.length === 0 ? (
+                  <div className="px-3 pb-2 text-xs text-gray-600">None</div>
+                ) : todayEmails.map(em => (
+                  <div key={em.id} className="px-3 py-2 hover:bg-gray-900 cursor-pointer" onClick={() => { setNotifOpen(false); navigate('/emails'); }}>
+                    <div className="text-sm text-gray-200 truncate" title={em.subject}>{em.subject}</div>
+                    <div className="text-xs text-gray-500 truncate">{em.sender}</div>
+                  </div>
+                ))}
+                <div className="px-3 pt-3 text-xs text-gray-500">Action items for today</div>
+                {todayActions.length === 0 ? (
+                  <div className="px-3 pb-3 text-xs text-gray-600">None</div>
+                ) : todayActions.map(ai => (
+                  <div key={ai.id} className="px-3 py-2 hover:bg-gray-900 cursor-pointer" onClick={() => { setNotifOpen(false); navigate('/action-items'); }}>
+                    <div className="text-sm text-gray-200 truncate" title={ai.description}>{ai.description}</div>
+                    <div className="text-xs text-gray-500">{ai.priority}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         {children}
       </main>
