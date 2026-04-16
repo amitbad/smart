@@ -34,7 +34,8 @@ export default function ActionItems() {
     description: '',
     priority: 'Medium',
     status: 'Not Started',
-    dependency_member_ids: []
+    dependency_member_ids: [],
+    reference_link: ''
   });
 
   useEffect(() => { fetchMembers(); }, []);
@@ -73,7 +74,7 @@ export default function ActionItems() {
 
   const todaysItems = useMemo(() => items.filter(it => it.action_date === today), [items, today]);
 
-  const openAdd = () => { setEditing(null); setForm({ action_date: today, description: '', priority: 'Medium', status: 'Not Started', dependency_member_ids: [] }); setModalOpen(true); setLockModal(true); };
+  const openAdd = () => { setEditing(null); setForm({ action_date: today, description: '', priority: 'Medium', status: 'Not Started', dependency_member_ids: [], reference_link: '' }); setModalOpen(true); setLockModal(true); };
   const openEdit = (it) => {
     setEditing(it);
     setForm({
@@ -81,7 +82,8 @@ export default function ActionItems() {
       description: it.description,
       priority: it.priority,
       status: it.status,
-      dependency_member_ids: it.dependency_member_ids || []
+      dependency_member_ids: it.dependency_member_ids || [],
+      reference_link: it.reference_link || ''
     });
     setModalOpen(true);
     setLockModal(true);
@@ -96,7 +98,8 @@ export default function ActionItems() {
         priority: form.priority,
         status: form.status,
         // server expects single dependency_member_id; send first selected or null
-        dependency_member_id: form.dependency_member_ids?.[0] || null
+        dependency_member_id: form.dependency_member_ids?.[0] || null,
+        reference_link: form.reference_link || null
       };
       if (editing) {
         await axios.put(`/api/action-items/${editing.id}`, payload);
@@ -143,7 +146,8 @@ export default function ActionItems() {
         description: it.description,
         priority: it.priority,
         status: it.status,
-        dependency_member_ids: it.dependency_member_ids || []
+        dependency_member_ids: it.dependency_member_ids || [],
+        reference_link: it.reference_link || null
       };
       await axios.post('/api/action-items', payload);
       toast.success('Action item duplicated');
@@ -330,6 +334,16 @@ export default function ActionItems() {
           <div>
             <label className="block text-sm mb-1">Action Item</label>
             <textarea value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} rows={4} className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm" placeholder="Describe the action" />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Reference Link (optional)</label>
+            <input
+              type="url"
+              value={form.reference_link}
+              onChange={(e) => setForm(f => ({ ...f, reference_link: e.target.value }))}
+              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm"
+              placeholder="https://example.com/reference"
+            />
           </div>
           <div className="flex justify-end gap-3">
             <button onClick={() => setModalOpen(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm">Close</button>

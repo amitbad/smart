@@ -42,6 +42,7 @@ const actionItemSchema = new mongoose.Schema({
   priority: { type: String, enum: ['Low', 'Medium', 'High', 'Critical'], default: 'Medium' },
   status: { type: String, enum: ['Pending', 'Not Started', 'In Progress', 'Completed', 'Deferred', 'Put On Hold'], default: 'Pending' },
   dependency_member_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
+  reference_link: { type: String, default: null },
   created_at: { type: Date, default: Date.now }
 });
 

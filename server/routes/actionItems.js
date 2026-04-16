@@ -1,5 +1,6 @@
 import express from 'express';
 import { getDB, getDBType } from '../db/index.js';
+import { encryptUrl, decryptUrl } from '../utils/encryption.js';
 
 const router = express.Router();
 
@@ -17,7 +18,14 @@ router.get('/', async (req, res) => {
     if (dependency) filter.dependency_member_id = dependency;
 
     const actionItems = await db.findAll('actionItems', filter, { sort: { action_date: -1, created_at: -1 } });
-    res.json(actionItems);
+
+    // Decrypt reference links before sending to client
+    const decryptedItems = actionItems.map(item => ({
+      ...item,
+      reference_link: item.reference_link ? decryptUrl(item.reference_link) : null
+    }));
+
+    res.json(decryptedItems);
   } catch (err) {
     console.error('Error fetching action items:', err);
     res.status(500).json({ error: 'Failed to fetch action items' });
@@ -26,18 +34,29 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { action_date, description, priority, status, dependency_member_id } = req.body;
+    const { action_date, description, priority, status, dependency_member_id, reference_link } = req.body;
     if (!action_date || !description) {
       return res.status(400).json({ error: 'Date and description are required' });
     }
     const db = getDB();
+
+    // Encrypt reference link if provided
+    const encryptedLink = reference_link ? encryptUrl(reference_link) : null;
+
     const newItem = await db.create('actionItems', {
       action_date: new Date(action_date),
       description,
       priority: priority || 'Medium',
       status: status || 'Pending',
-      dependency_member_id: dependency_member_id || null
+      dependency_member_id: dependency_member_id || null,
+      reference_link: encryptedLink
     });
+
+    // Decrypt reference link before sending response
+    if (newItem.reference_link) {
+      newItem.reference_link = decryptUrl(newItem.reference_link);
+    }
+
     res.status(201).json(newItem);
   } catch (err) {
     console.error('Error creating action item:', err);
@@ -48,7 +67,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { action_date, description, priority, status, dependency_member_id } = req.body;
+    const { action_date, description, priority, status, dependency_member_id, reference_link } = req.body;
     const db = getDB();
 
     const updateData = { updated_at: new Date() };
@@ -57,9 +76,19 @@ router.put('/:id', async (req, res) => {
     if (priority) updateData.priority = priority;
     if (status) updateData.status = status;
     if (dependency_member_id !== undefined) updateData.dependency_member_id = dependency_member_id || null;
+    if (reference_link !== undefined) {
+      // Encrypt reference link if provided, otherwise set to null
+      updateData.reference_link = reference_link ? encryptUrl(reference_link) : null;
+    }
 
     const updated = await db.update('actionItems', id, updateData);
     if (!updated) return res.status(404).json({ error: 'Not found' });
+
+    // Decrypt reference link before sending response
+    if (updated.reference_link) {
+      updated.reference_link = decryptUrl(updated.reference_link);
+    }
+
     res.json(updated);
   } catch (err) {
     console.error('Error updating action item:', err);

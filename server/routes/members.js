@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { getDB, getDBType } from '../db/index.js';
+import { encrypt, decrypt } from '../utils/encryption.js';
 
 const router = express.Router();
 
@@ -31,8 +32,14 @@ router.get('/', async (req, res) => {
         populate: ['manager_id', 'designation_id', 'department_id']
       });
 
+      // Decrypt emails before sending to client
+      const decryptedMembers = members.map(m => ({
+        ...m,
+        email: m.email ? decrypt(m.email) : m.email
+      }));
+
       return res.json({
-        data: members,
+        data: decryptedMembers,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),
@@ -170,6 +177,11 @@ router.get('/:id', async (req, res) => {
       }
       member.skills = [];
 
+      // Decrypt email before sending
+      if (member.email) {
+        member.email = decrypt(member.email);
+      }
+
       return res.json(member);
     }
 
@@ -211,7 +223,12 @@ router.get('/:id/reportees', async (req, res) => {
 
     if (dbType === 'Mongo') {
       const reportees = await db.findAll('members', { manager_id: id }, { sort: { name: 1 } });
-      return res.json(reportees);
+      // Decrypt emails before sending
+      const decryptedReportees = reportees.map(r => ({
+        ...r,
+        email: r.email ? decrypt(r.email) : r.email
+      }));
+      return res.json(decryptedReportees);
     }
 
     const result = await pool.query(`
@@ -239,15 +256,21 @@ router.post('/', async (req, res) => {
 
     // MongoDB simple create
     if (dbType === 'Mongo') {
+      // Encrypt email before storing
+      const encryptedEmail = encrypt(email);
+
       const newMember = await db.create('members', {
         name,
-        email,
+        email: encryptedEmail,
         designation,
         level: level || 1,
         manager_id: manager_id || null,
         designation_id: designation_id || null,
         department_id: department_id || null
       });
+
+      // Decrypt email before sending response
+      newMember.email = decrypt(newMember.email);
 
       return res.status(201).json(newMember);
     }
@@ -323,7 +346,7 @@ router.put('/:id', async (req, res) => {
     if (dbType === 'Mongo') {
       const updateData = { updated_at: new Date() };
       if (name) updateData.name = name;
-      if (email) updateData.email = email;
+      if (email) updateData.email = encrypt(email); // Encrypt email before storing
       if (designation) updateData.designation = designation;
       if (level !== undefined) updateData.level = level;
       if (manager_id !== undefined) updateData.manager_id = manager_id || null;
@@ -334,6 +357,12 @@ router.put('/:id', async (req, res) => {
       if (!updated) {
         return res.status(404).json({ error: 'Member not found' });
       }
+
+      // Decrypt email before sending response
+      if (updated.email) {
+        updated.email = decrypt(updated.email);
+      }
+
       return res.json(updated);
     }
 
