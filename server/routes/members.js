@@ -358,12 +358,39 @@ router.put('/:id', async (req, res) => {
         return res.status(404).json({ error: 'Member not found' });
       }
 
-      // Decrypt email before sending response
-      if (updated.email) {
-        updated.email = safeDecrypt(updated.email);
+      // Handle skills update for MongoDB
+      if (skills !== undefined) {
+        // Delete existing member_skills
+        await db.delete('memberSkills', { member_id: id });
+
+        // Add new skills
+        if (skills.length > 0) {
+          for (const skillId of skills) {
+            await db.create('memberSkills', {
+              member_id: id,
+              skill_id: skillId
+            });
+          }
+        }
       }
 
-      return res.json(updated);
+      // Fetch updated member with skills
+      const memberWithSkills = await db.findById('members', id);
+      const skillsData = await db.findAll('memberSkills', { member_id: id });
+      const skillIds = skillsData.map(ms => ms.skill_id);
+      const memberSkills = [];
+      for (const skillId of skillIds) {
+        const skill = await db.findById('skills', skillId);
+        if (skill) memberSkills.push(skill);
+      }
+      memberWithSkills.skills = memberSkills;
+
+      // Decrypt email before sending response
+      if (memberWithSkills.email) {
+        memberWithSkills.email = safeDecrypt(memberWithSkills.email);
+      }
+
+      return res.json(memberWithSkills);
     }
 
     // PostgreSQL with transactions

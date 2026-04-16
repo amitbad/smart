@@ -205,25 +205,33 @@ export default function Members() {
                           </span>
                         </td>
                         <td className="px-5 py-3">
-                          <div className="flex flex-wrap gap-1">
-                            {member.skills && member.skills.length > 0 ? (
-                              member.skills.slice(0, 3).map((skill, idx) => (
-                                <span
-                                  key={idx}
-                                  className="px-2 py-0.5 bg-cyan-600/20 text-cyan-400 rounded text-xs"
-                                >
-                                  {skill.name}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-gray-500 text-xs">No skills</span>
-                            )}
-                            {member.skills && member.skills.length > 3 && (
-                              <span className="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-xs">
-                                +{member.skills.length - 3}
+                          {member.skills && member.skills.length > 0 ? (
+                            <div className="relative group inline-block">
+                              <span className="px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded text-xs font-medium cursor-help">
+                                {member.skills.length} {member.skills.length === 1 ? 'skill' : 'skills'}
                               </span>
-                            )}
-                          </div>
+                              {/* Tooltip */}
+                              <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-50 w-max max-w-xs">
+                                <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3">
+                                  <div className="text-xs font-semibold text-gray-400 mb-2">Skills:</div>
+                                  <div className="flex flex-wrap gap-1">
+                                    {member.skills.map((skill, idx) => (
+                                      <span
+                                        key={idx}
+                                        className="px-2 py-0.5 bg-cyan-600/20 text-cyan-400 rounded text-xs"
+                                      >
+                                        {skill.name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  {/* Arrow */}
+                                  <div className="absolute left-4 top-full w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-gray-700"></div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-gray-500 text-xs">No skills</span>
+                          )}
                         </td>
                         <td className="px-5 py-3">
                           <div className="flex gap-2">

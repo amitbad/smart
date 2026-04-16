@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, Filter, Bell, Copy, ExternalLink, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye } from 'lucide-react';
 import axios from 'axios';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
 import { useToast } from '../components/ToastContainer';
@@ -29,6 +29,7 @@ export default function ActionItems() {
   const [toDelete, setToDelete] = useState(null);
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
+  const [collapsedDates, setCollapsedDates] = useState(new Set());
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -70,9 +71,35 @@ export default function ActionItems() {
       (acc[it.action_date] = acc[it.action_date] || []).push(it);
       return acc;
     }, {});
-    // sort dates desc
-    return Object.entries(byDate).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+    // sort dates desc and limit to last 5 working dates
+    const sortedDates = Object.entries(byDate).sort((a, b) => new Date(b[0]) - new Date(a[0]));
+    return sortedDates.slice(0, 5);
   }, [items]);
+
+  // Initialize collapsed state: collapse all except today's date
+  useEffect(() => {
+    if (grouped.length > 0) {
+      const collapsed = new Set();
+      grouped.forEach(([date]) => {
+        if (date !== today) {
+          collapsed.add(date);
+        }
+      });
+      setCollapsedDates(collapsed);
+    }
+  }, [grouped, today]);
+
+  const toggleDateCollapse = (date) => {
+    setCollapsedDates(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(date)) {
+        newSet.delete(date);
+      } else {
+        newSet.add(date);
+      }
+      return newSet;
+    });
+  };
 
   const todaysItems = useMemo(() => items.filter(it => it.action_date === today), [items, today]);
 
@@ -241,86 +268,105 @@ export default function ActionItems() {
         ) : grouped.length === 0 ? (
           <div className="text-gray-500">No action items</div>
         ) : (
-          grouped.map(([date, rows]) => (
-            <div key={date} className="mb-6">
-              <div className="text-sm text-gray-400 mb-2">{new Date(date).toDateString()}</div>
-              <div className="bg-black border border-gray-800 rounded overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-900 text-xs text-gray-500">
-                    <tr>
-                      <th className="px-4 py-2 text-left">Action Item</th>
-                      <th className="px-4 py-2 text-left">Priority</th>
-                      <th className="px-4 py-2 text-left">Dependency On</th>
-                      <th className="px-4 py-2 text-left">Status</th>
-                      <th className="px-4 py-2 text-left">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800">
-                    {rows.map(it => (
-                      <tr key={it.id} className="hover:bg-gray-900">
-                        <td className="px-4 py-2 max-w-[420px]">
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => openViewDetails(it)}
-                              className="text-left truncate hover:text-cyan-400 transition-colors flex-1"
-                              title="Click to view details"
-                            >
-                              {it.description}
-                            </button>
-                            {it.reference_link && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(it.reference_link, '_blank', 'noopener,noreferrer');
-                                }}
-                                className="text-cyan-400 hover:text-cyan-300 flex-shrink-0"
-                                title="Open reference link"
-                              >
-                                <ExternalLink size={16} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2"><Pill text={it.priority} kind="priority" /></td>
-                        <td className="px-4 py-2 text-gray-300">
-                          {it.dependency_member_ids?.length ? (() => {
-                            const id = it.dependency_member_ids[0];
-                            const m = members.find(mm => mm.id === id);
-                            return <span>{m ? `${m.name}${m.designation ? ` (${m.designation})` : ''}` : `#${id}`}</span>;
-                          })() : (
-                            <span className="text-gray-500 text-xs">None</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2"><Pill text={it.status} /></td>
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => openEdit(it)} className="text-gray-400 hover:text-white" title="Edit"><Edit2 size={16} /></button>
-                            <div className="relative inline-block">
-                              <button className="text-gray-400 hover:text-white flex items-center gap-1" title="Update Priority">
-                                <Filter size={16} /><ChevronDown size={14} />
-                              </button>
-                              <div className="absolute hidden group-hover:block"></div>
-                              <div className="absolute mt-1 bg-black border border-gray-800 rounded shadow-lg z-10 hidden"></div>
-                            </div>
-                            <select className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
-                              value={it.priority} onChange={(e) => updateQuick(it, 'priority', e.target.value)}>
-                              {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                            </select>
-                            <select className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
-                              value={it.status} onChange={(e) => updateQuick(it, 'status', e.target.value)}>
-                              {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                            <button onClick={() => handleDuplicate(it)} className="text-gray-400 hover:text-white" title="Duplicate"><Copy size={16} /></button>
-                            <button onClick={() => requestDelete(it)} className={`text-gray-400 hover:text-red-400 ${it.status === 'Completed' ? 'opacity-40 cursor-not-allowed' : ''}`} disabled={it.status === 'Completed'} title="Delete"><Trash2 size={16} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          grouped.map(([date, rows]) => {
+            const isCollapsed = collapsedDates.has(date);
+            const isToday = date === today;
+            return (
+              <div key={date} className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    onClick={() => toggleDateCollapse(date)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                    title={isCollapsed ? 'Expand' : 'Collapse'}
+                  >
+                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                  </button>
+                  <div className="text-sm text-gray-400">
+                    {new Date(date).toDateString()}
+                    {isToday && <span className="ml-2 text-xs bg-cyan-600/20 text-cyan-400 px-2 py-0.5 rounded">Today</span>}
+                    <span className="ml-2 text-xs text-gray-500">({rows.length} items)</span>
+                  </div>
+                </div>
+                {!isCollapsed && (
+                  <div className="bg-black border border-gray-800 rounded overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-900 text-xs text-gray-500">
+                        <tr>
+                          <th className="px-4 py-2 text-left">Action Item</th>
+                          <th className="px-4 py-2 text-left">Priority</th>
+                          <th className="px-4 py-2 text-left">Dependency On</th>
+                          <th className="px-4 py-2 text-left">Status</th>
+                          <th className="px-4 py-2 text-left">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-800">
+                        {rows.map(it => (
+                          <tr key={it.id} className="hover:bg-gray-900">
+                            <td className="px-4 py-2 max-w-[420px]">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => openViewDetails(it)}
+                                  className="text-left truncate hover:text-cyan-400 transition-colors flex-1"
+                                  title="Click to view details"
+                                >
+                                  {it.description}
+                                </button>
+                                {it.reference_link && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      window.open(it.reference_link, '_blank', 'noopener,noreferrer');
+                                    }}
+                                    className="text-cyan-400 hover:text-cyan-300 flex-shrink-0"
+                                    title="Open reference link"
+                                  >
+                                    <ExternalLink size={16} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2"><Pill text={it.priority} kind="priority" /></td>
+                            <td className="px-4 py-2 text-gray-300">
+                              {it.dependency_member_ids?.length ? (() => {
+                                const id = it.dependency_member_ids[0];
+                                const m = members.find(mm => mm.id === id);
+                                return <span>{m ? `${m.name}${m.designation ? ` (${m.designation})` : ''}` : `#${id}`}</span>;
+                              })() : (
+                                <span className="text-gray-500 text-xs">None</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2"><Pill text={it.status} /></td>
+                            <td className="px-4 py-2">
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => openEdit(it)} className="text-gray-400 hover:text-white" title="Edit"><Edit2 size={16} /></button>
+                                <div className="relative inline-block">
+                                  <button className="text-gray-400 hover:text-white flex items-center gap-1" title="Update Priority">
+                                    <Filter size={16} /><ChevronDown size={14} />
+                                  </button>
+                                  <div className="absolute hidden group-hover:block"></div>
+                                  <div className="absolute mt-1 bg-black border border-gray-800 rounded shadow-lg z-10 hidden"></div>
+                                </div>
+                                <select className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                  value={it.priority} onChange={(e) => updateQuick(it, 'priority', e.target.value)}>
+                                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <select className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                  value={it.status} onChange={(e) => updateQuick(it, 'status', e.target.value)}>
+                                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                                <button onClick={() => handleDuplicate(it)} className="text-gray-400 hover:text-white" title="Duplicate"><Copy size={16} /></button>
+                                <button onClick={() => requestDelete(it)} className={`text-gray-400 hover:text-red-400 ${it.status === 'Completed' ? 'opacity-40 cursor-not-allowed' : ''}`} disabled={it.status === 'Completed'} title="Delete"><Trash2 size={16} /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
 
