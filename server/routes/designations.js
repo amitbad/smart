@@ -1,13 +1,14 @@
 import express from 'express';
-import pool from '../config/database.js';
+import { getDB } from '../db/index.js';
 
 const router = express.Router();
 
 // List all designations (alphabetical)
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name FROM designations ORDER BY name ASC');
-    res.json(result.rows);
+    const db = getDB();
+    const designations = await db.findAll('designations', {}, { sort: { name: 1 } });
+    res.json(designations);
   } catch (error) {
     console.error('Error fetching designations:', error);
     res.status(500).json({ error: 'Failed to fetch designations' });
@@ -21,18 +22,15 @@ router.post('/', async (req, res) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Designation name is required' });
     }
-    const result = await pool.query(
-      'INSERT INTO designations (name) VALUES ($1) ON CONFLICT (name) DO NOTHING RETURNING id, name',
-      [name.trim()]
-    );
+    const db = getDB();
 
-    if (result.rows.length === 0) {
-      // Already exists, fetch existing
-      const existing = await pool.query('SELECT id, name FROM designations WHERE name = $1', [name.trim()]);
-      return res.status(200).json(existing.rows[0]);
+    const existing = await db.findOne('designations', { name: name.trim() });
+    if (existing) {
+      return res.status(200).json(existing);
     }
 
-    res.status(201).json(result.rows[0]);
+    const newDesignation = await db.create('designations', { name: name.trim() });
+    res.status(201).json(newDesignation);
   } catch (error) {
     console.error('Error creating designation:', error);
     res.status(500).json({ error: 'Failed to create designation' });
@@ -47,14 +45,12 @@ router.put('/:id', async (req, res) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Designation name is required' });
     }
-    const result = await pool.query(
-      'UPDATE designations SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name',
-      [name.trim(), id]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(result.rows[0]);
+    const db = getDB();
+    const updated = await db.update('designations', id, { name: name.trim(), updated_at: new Date() });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
   } catch (error) {
-    if (error.code === '23505') {
+    if (error.code === '23505' || error.code === 11000) {
       return res.status(409).json({ error: 'Designation name must be unique' });
     }
     console.error('Error updating designation:', error);
@@ -66,8 +62,9 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const del = await pool.query('DELETE FROM designations WHERE id = $1', [id]);
-    if (del.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const db = getDB();
+    const deleted = await db.delete('designations', id);
+    if (!deleted) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted' });
   } catch (error) {
     console.error('Error deleting designation:', error);

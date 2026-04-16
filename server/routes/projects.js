@@ -1,5 +1,5 @@
 import express from 'express';
-import pool from '../config/database.js';
+import { getDB, getDBType } from '../db/index.js';
 
 const router = express.Router();
 
@@ -7,15 +7,20 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { q } = req.query;
-    let sql = 'SELECT id, code, delivery_manager_id FROM projects';
-    const params = [];
+    const db = getDB();
+    const dbType = getDBType();
+
+    let projects;
     if (q && q.trim()) {
-      sql += ' WHERE code ILIKE $1';
-      params.push(`%${q.trim()}%`);
+      if (dbType === 'Mongo') {
+        projects = await db.findAll('projects', { code: new RegExp(q.trim(), 'i') }, { sort: { code: 1 } });
+      } else {
+        projects = await db.query('SELECT * FROM projects WHERE code ILIKE $1 ORDER BY code ASC', [`%${q.trim()}%`]);
+      }
+    } else {
+      projects = await db.findAll('projects', {}, { sort: { code: 1 } });
     }
-    sql += ' ORDER BY code ASC';
-    const result = await pool.query(sql, params);
-    res.json(result.rows);
+    res.json(projects);
   } catch (error) {
     console.error('Error fetching projects:', error);
     res.status(500).json({ error: 'Failed to fetch projects' });
@@ -27,14 +32,12 @@ router.post('/', async (req, res) => {
   try {
     const { code, delivery_manager_id } = req.body;
     if (!code || !code.trim()) return res.status(400).json({ error: 'Project code is required' });
-    const dm = delivery_manager_id ? parseInt(delivery_manager_id) : null;
-    const result = await pool.query(
-      'INSERT INTO projects (code, delivery_manager_id) VALUES ($1, $2) RETURNING id, code, delivery_manager_id',
-      [code.trim(), dm]
-    );
-    res.status(201).json(result.rows[0]);
+    const db = getDB();
+    const dm = delivery_manager_id || null;
+    const newProject = await db.create('projects', { code: code.trim(), delivery_manager_id: dm });
+    res.status(201).json(newProject);
   } catch (error) {
-    if (error.code === '23505') return res.status(409).json({ error: 'Project code must be unique' });
+    if (error.code === '23505' || error.code === 11000) return res.status(409).json({ error: 'Project code must be unique' });
     console.error('Error creating project:', error);
     res.status(500).json({ error: 'Failed to create project' });
   }
@@ -46,15 +49,13 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { code, delivery_manager_id } = req.body;
     if (!code || !code.trim()) return res.status(400).json({ error: 'Project code is required' });
-    const dm = delivery_manager_id ? parseInt(delivery_manager_id) : null;
-    const result = await pool.query(
-      'UPDATE projects SET code = $1, delivery_manager_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING id, code, delivery_manager_id',
-      [code.trim(), dm, id]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(result.rows[0]);
+    const db = getDB();
+    const dm = delivery_manager_id || null;
+    const updated = await db.update('projects', id, { code: code.trim(), delivery_manager_id: dm, updated_at: new Date() });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
   } catch (error) {
-    if (error.code === '23505') return res.status(409).json({ error: 'Project code must be unique' });
+    if (error.code === '23505' || error.code === 11000) return res.status(409).json({ error: 'Project code must be unique' });
     console.error('Error updating project:', error);
     res.status(500).json({ error: 'Failed to update project' });
   }
@@ -64,8 +65,9 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const del = await pool.query('DELETE FROM projects WHERE id = $1', [id]);
-    if (del.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const db = getDB();
+    const deleted = await db.delete('projects', id);
+    if (!deleted) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted' });
   } catch (error) {
     console.error('Error deleting project:', error);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell } from 'lucide-react';
+import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon } from 'lucide-react';
 import axios from 'axios';
 
 export default function Layout({ children, user, onLogout }) {
@@ -86,6 +86,17 @@ export default function Layout({ children, user, onLogout }) {
           >
             <Briefcase size={16} className="flex-shrink-0" />
             {!sidebarCollapsed && <span>Bench</span>}
+          </Link>
+
+          <Link
+            to="/important-links"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/important-links')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <LinkIcon size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Important Links</span>}
           </Link>
 
           <Link

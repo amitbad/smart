@@ -14,6 +14,7 @@ import ActionItems from './pages/ActionItems';
 import Masters from './pages/Masters';
 import Emails from './pages/Emails';
 import Bench from './pages/Bench';
+import ImportantLinks from './pages/ImportantLinks';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -70,6 +71,7 @@ function App() {
             <Route path="/action-items" element={<ActionItems />} />
             <Route path="/emails" element={<Emails />} />
             <Route path="/bench" element={<Bench />} />
+            <Route path="/important-links" element={<ImportantLinks />} />
             <Route path="/masters" element={<Masters />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/change-password" element={<ChangePassword />} />

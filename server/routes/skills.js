@@ -1,12 +1,13 @@
 import express from 'express';
-import pool from '../config/database.js';
+import { getDB } from '../db/index.js';
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM skills ORDER BY name');
-    res.json(result.rows);
+    const db = getDB();
+    const skills = await db.findAll('skills', {}, { sort: { name: 1 } });
+    res.json(skills);
   } catch (error) {
     console.error('Error fetching skills:', error);
     res.status(500).json({ error: 'Failed to fetch skills' });
@@ -16,19 +17,16 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { name } = req.body;
-    
+
     if (!name) {
       return res.status(400).json({ error: 'Skill name is required' });
     }
 
-    const result = await pool.query(
-      'INSERT INTO skills (name) VALUES ($1) RETURNING *',
-      [name]
-    );
-    
-    res.status(201).json(result.rows[0]);
+    const db = getDB();
+    const newSkill = await db.create('skills', { name });
+    res.status(201).json(newSkill);
   } catch (error) {
-    if (error.code === '23505') {
+    if (error.code === '23505' || error.code === 11000) {
       return res.status(409).json({ error: 'Skill already exists' });
     }
     console.error('Error creating skill:', error);
@@ -39,12 +37,13 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await pool.query('DELETE FROM skills WHERE id = $1 RETURNING *', [id]);
-    
-    if (result.rows.length === 0) {
+    const db = getDB();
+    const deleted = await db.delete('skills', id);
+
+    if (!deleted) {
       return res.status(404).json({ error: 'Skill not found' });
     }
-    
+
     res.json({ message: 'Skill deleted successfully' });
   } catch (error) {
     console.error('Error deleting skill:', error);

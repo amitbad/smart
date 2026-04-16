@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { initializeDatabase, getDBType } from './db/index.js';
 import memberRoutes from './routes/members.js';
 import skillRoutes from './routes/skills.js';
 import designationRoutes from './routes/designations.js';
@@ -9,6 +10,7 @@ import departmentRoutes from './routes/departments.js';
 import projectRoutes from './routes/projects.js';
 import emailRoutes from './routes/emails.js';
 import benchRoutes from './routes/bench.js';
+import importantLinksRoutes from './routes/importantLinks.js';
 import authRoutes from './routes/auth.js';
 
 dotenv.config();
@@ -28,12 +30,25 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/bench', benchRoutes);
+app.use('/api/important-links', importantLinksRoutes);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Smart API is running' });
+  const dbType = getDBType();
+  res.json({ status: 'ok', message: 'Smart API is running', database: dbType });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📊 API available at http://localhost:${PORT}/api`);
-});
+const startServer = async () => {
+  try {
+    await initializeDatabase();
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+      console.log(`📊 API available at http://localhost:${PORT}/api`);
+      console.log(`💾 Database: ${getDBType()}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

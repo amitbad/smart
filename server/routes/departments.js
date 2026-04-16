@@ -1,13 +1,14 @@
 import express from 'express';
-import pool from '../config/database.js';
+import { getDB } from '../db/index.js';
 
 const router = express.Router();
 
 // List all departments (alphabetical)
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, name FROM departments ORDER BY name ASC');
-    res.json(result.rows);
+    const db = getDB();
+    const departments = await db.findAll('departments', {}, { sort: { name: 1 } });
+    res.json(departments);
   } catch (error) {
     console.error('Error fetching departments:', error);
     res.status(500).json({ error: 'Failed to fetch departments' });
@@ -21,15 +22,15 @@ router.post('/', async (req, res) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Department name is required' });
     }
-    const result = await pool.query(
-      'INSERT INTO departments (name) VALUES ($1) ON CONFLICT (name) DO NOTHING RETURNING id, name',
-      [name.trim()]
-    );
-    if (result.rows.length === 0) {
-      const existing = await pool.query('SELECT id, name FROM departments WHERE name = $1', [name.trim()]);
-      return res.status(200).json(existing.rows[0]);
+    const db = getDB();
+
+    const existing = await db.findOne('departments', { name: name.trim() });
+    if (existing) {
+      return res.status(200).json(existing);
     }
-    res.status(201).json(result.rows[0]);
+
+    const newDepartment = await db.create('departments', { name: name.trim() });
+    res.status(201).json(newDepartment);
   } catch (error) {
     console.error('Error creating department:', error);
     res.status(500).json({ error: 'Failed to create department' });
@@ -44,14 +45,12 @@ router.put('/:id', async (req, res) => {
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'Department name is required' });
     }
-    const result = await pool.query(
-      'UPDATE departments SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id, name',
-      [name.trim(), id]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(result.rows[0]);
+    const db = getDB();
+    const updated = await db.update('departments', id, { name: name.trim(), updated_at: new Date() });
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
   } catch (error) {
-    if (error.code === '23505') {
+    if (error.code === '23505' || error.code === 11000) {
       return res.status(409).json({ error: 'Department name must be unique' });
     }
     console.error('Error updating department:', error);
@@ -63,8 +62,9 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const del = await pool.query('DELETE FROM departments WHERE id = $1', [id]);
-    if (del.rowCount === 0) return res.status(404).json({ error: 'Not found' });
+    const db = getDB();
+    const deleted = await db.delete('departments', id);
+    if (!deleted) return res.status(404).json({ error: 'Not found' });
     res.json({ message: 'Deleted' });
   } catch (error) {
     console.error('Error deleting department:', error);

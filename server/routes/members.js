@@ -1,5 +1,6 @@
 import express from 'express';
 import pool from '../config/database.js';
+import { getDB, getDBType } from '../db/index.js';
 
 const router = express.Router();
 
@@ -7,7 +8,41 @@ router.get('/', async (req, res) => {
   try {
     const { page = 1, limit = 20, search = '', level = '' } = req.query;
     const offset = (page - 1) * limit;
+    const db = getDB();
+    const dbType = getDBType();
 
+    // MongoDB simple implementation
+    if (dbType === 'Mongo') {
+      const filter = {};
+      if (search) {
+        const regex = new RegExp(search, 'i');
+        filter.$or = [
+          { name: regex },
+          { email: regex }
+        ];
+      }
+      if (level) filter.level = parseInt(level);
+
+      const totalRecords = await db.count('members', filter);
+      const members = await db.findAll('members', filter, {
+        sort: { created_at: -1 },
+        limit: parseInt(limit),
+        skip: offset,
+        populate: ['manager_id', 'designation_id', 'department_id']
+      });
+
+      return res.json({
+        members,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalRecords / limit),
+          totalRecords,
+          pageSize: parseInt(limit)
+        }
+      });
+    }
+
+    // PostgreSQL with complex JOINs
     let whereClause = 'WHERE 1=1';
     const params = [];
     let paramIndex = 1;
@@ -68,6 +103,19 @@ router.get('/', async (req, res) => {
 
 router.get('/hierarchy', async (req, res) => {
   try {
+    const db = getDB();
+    const dbType = getDBType();
+
+    // MongoDB simple hierarchy
+    if (dbType === 'Mongo') {
+      const members = await db.findAll('members', {}, {
+        sort: { level: 1, name: 1 },
+        populate: ['manager_id', 'designation_id']
+      });
+      return res.json(members);
+    }
+
+    // PostgreSQL recursive CTE
     const result = await pool.query(`
       WITH RECURSIVE member_hierarchy AS (
         SELECT 
@@ -99,6 +147,33 @@ router.get('/hierarchy', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const db = getDB();
+    const dbType = getDBType();
+
+    // MongoDB simple get
+    if (dbType === 'Mongo') {
+      const member = await db.findById('members', id);
+      if (!member) return res.status(404).json({ error: 'Member not found' });
+
+      // Populate related data
+      if (member.manager_id) {
+        const manager = await db.findById('members', member.manager_id);
+        member.manager_name = manager?.name;
+      }
+      if (member.designation_id) {
+        const designation = await db.findById('designations', member.designation_id);
+        member.designation = designation?.name;
+      }
+      if (member.department_id) {
+        const department = await db.findById('departments', member.department_id);
+        member.department = department?.name;
+      }
+      member.skills = [];
+
+      return res.json(member);
+    }
+
+    // PostgreSQL with JOINs
     const result = await pool.query(`
       SELECT 
         m.*,

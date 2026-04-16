@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import pool from '../config/database.js';
+import { getDB, getDBType } from '../db/index.js';
 
 const router = express.Router();
 
@@ -12,16 +12,12 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1',
-      [username]
-    );
+    const db = getDB();
+    const user = await db.findOne('users', { username });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-
-    const user = result.rows[0];
     const isValidPassword = await bcrypt.compare(password, user.password);
 
     if (!isValidPassword) {
@@ -29,7 +25,7 @@ router.post('/login', async (req, res) => {
     }
 
     res.json({
-      id: user.id,
+      id: user.id || user._id,
       username: user.username,
       role: user.role,
       message: 'Login successful'
@@ -45,27 +41,23 @@ router.post('/change-password', async (req, res) => {
     const { username, currentPassword, newPassword } = req.body;
 
     if (!username || !currentPassword || !newPassword) {
-      return res.status(400).json({ 
-        error: 'Username, current password, and new password are required' 
+      return res.status(400).json({
+        error: 'Username, current password, and new password are required'
       });
     }
 
     if (newPassword.length < 4) {
-      return res.status(400).json({ 
-        error: 'New password must be at least 4 characters long' 
+      return res.status(400).json({
+        error: 'New password must be at least 4 characters long'
       });
     }
 
-    const result = await pool.query(
-      'SELECT * FROM users WHERE username = $1',
-      [username]
-    );
+    const db = getDB();
+    const user = await db.findOne('users', { username });
 
-    if (result.rows.length === 0) {
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
-
-    const user = result.rows[0];
     const isValidPassword = await bcrypt.compare(currentPassword, user.password);
 
     if (!isValidPassword) {
@@ -73,11 +65,8 @@ router.post('/change-password', async (req, res) => {
     }
 
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-
-    await pool.query(
-      'UPDATE users SET password = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-      [hashedNewPassword, user.id]
-    );
+    const userId = user.id || user._id;
+    await db.update('users', userId, { password: hashedNewPassword, updated_at: new Date() });
 
     res.json({ message: 'Password updated successfully' });
   } catch (error) {
@@ -98,21 +87,23 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Role must be ADMIN or USER' });
     }
 
+    const db = getDB();
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const result = await pool.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
-      [username, hashedPassword, role]
-    );
+    const newUser = await db.create('users', {
+      username,
+      password: hashedPassword,
+      role
+    });
 
     res.status(201).json({
-      id: result.rows[0].id,
-      username: result.rows[0].username,
-      role: result.rows[0].role,
+      id: newUser.id || newUser._id,
+      username: newUser.username,
+      role: newUser.role,
       message: 'User created successfully'
     });
   } catch (error) {
-    if (error.code === '23505') {
+    if (error.code === '23505' || error.code === 11000) {
       return res.status(409).json({ error: 'Username already exists' });
     }
     console.error('Registration error:', error);

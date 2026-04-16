@@ -1,5 +1,5 @@
 import express from 'express';
-import pool from '../config/database.js';
+import { getDB, getDBType } from '../db/index.js';
 
 const router = express.Router();
 
@@ -7,26 +7,37 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const { member_id, project_id, status } = req.query;
-    const params = [];
-    let idx = 1;
-    let where = 'WHERE 1=1';
+    const db = getDB();
+    const dbType = getDBType();
 
-    if (member_id) { where += ` AND b.member_id = $${idx++}`; params.push(member_id); }
-    if (project_id) { where += ` AND b.project_id = $${idx++}`; params.push(project_id); }
-    if (status) { where += ` AND b.status = $${idx++}`; params.push(status); }
+    const filter = {};
+    if (member_id) filter.member_id = member_id;
+    if (project_id) filter.project_id = project_id;
+    if (status) filter.status = status;
 
-    const result = await pool.query(
-      `SELECT b.*, 
-              m.name as member_name, m.designation, m.level,
-              p.code as project_code
-       FROM bench b
-       LEFT JOIN members m ON b.member_id = m.id
-       LEFT JOIN projects p ON b.project_id = p.id
-       ${where}
-       ORDER BY b.assigned_date DESC, b.created_at DESC`,
-      params
-    );
-    res.json(result.rows);
+    let benchRecords;
+    if (dbType === 'Mongo') {
+      benchRecords = await db.findAll('bench', filter, {
+        sort: { assigned_date: -1, created_at: -1 },
+        populate: ['member_id', 'project_id']
+      });
+    } else {
+      let sql = `SELECT b.*, 
+                m.name as member_name, m.designation, m.level,
+                p.code as project_code
+         FROM bench b
+         LEFT JOIN members m ON b.member_id = m.id
+         LEFT JOIN projects p ON b.project_id = p.id
+         WHERE 1=1`;
+      const params = [];
+      let idx = 1;
+      if (member_id) { sql += ` AND b.member_id = $${idx++}`; params.push(member_id); }
+      if (project_id) { sql += ` AND b.project_id = $${idx++}`; params.push(project_id); }
+      if (status) { sql += ` AND b.status = $${idx++}`; params.push(status); }
+      sql += ' ORDER BY b.assigned_date DESC, b.created_at DESC';
+      benchRecords = await db.query(sql, params);
+    }
+    res.json(benchRecords);
   } catch (err) {
     console.error('Error fetching bench records:', err);
     res.status(500).json({ error: 'Failed to fetch bench records' });
@@ -39,13 +50,16 @@ router.post('/', async (req, res) => {
     if (!member_id || !assigned_date) {
       return res.status(400).json({ error: 'Member and Assigned Date are required' });
     }
-    const result = await pool.query(
-      `INSERT INTO bench (member_id, project_id, assigned_date, release_date, extension_date, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [member_id, project_id || null, assigned_date, release_date || null, extension_date || null, status || 'Working']
-    );
-    res.status(201).json(result.rows[0]);
+    const db = getDB();
+    const newBench = await db.create('bench', {
+      member_id,
+      project_id: project_id || null,
+      assigned_date: new Date(assigned_date),
+      release_date: release_date ? new Date(release_date) : null,
+      extension_date: extension_date ? new Date(extension_date) : null,
+      status: status || 'Working'
+    });
+    res.status(201).json(newBench);
   } catch (err) {
     console.error('Error creating bench record:', err);
     res.status(500).json({ error: 'Failed to create bench record' });
@@ -56,21 +70,19 @@ router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { member_id, project_id, assigned_date, release_date, extension_date, status } = req.body;
-    const result = await pool.query(
-      `UPDATE bench
-       SET member_id = COALESCE($1, member_id),
-           project_id = COALESCE($2, project_id),
-           assigned_date = COALESCE($3, assigned_date),
-           release_date = COALESCE($4, release_date),
-           extension_date = COALESCE($5, extension_date),
-           status = COALESCE($6, status),
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7
-       RETURNING *`,
-      [member_id, project_id, assigned_date, release_date, extension_date, status, id]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json(result.rows[0]);
+    const db = getDB();
+
+    const updateData = { updated_at: new Date() };
+    if (member_id) updateData.member_id = member_id;
+    if (project_id !== undefined) updateData.project_id = project_id || null;
+    if (assigned_date) updateData.assigned_date = new Date(assigned_date);
+    if (release_date !== undefined) updateData.release_date = release_date ? new Date(release_date) : null;
+    if (extension_date !== undefined) updateData.extension_date = extension_date ? new Date(extension_date) : null;
+    if (status) updateData.status = status;
+
+    const updated = await db.update('bench', id, updateData);
+    if (!updated) return res.status(404).json({ error: 'Not found' });
+    res.json(updated);
   } catch (err) {
     console.error('Error updating bench record:', err);
     res.status(500).json({ error: 'Failed to update bench record' });
@@ -80,13 +92,16 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const db = getDB();
+
     // Check status before deleting
-    const chk = await pool.query('SELECT status FROM bench WHERE id = $1', [id]);
-    if (chk.rows.length === 0) return res.status(404).json({ error: 'Not found' });
-    if (chk.rows[0].status === 'Working' || chk.rows[0].status === 'Project Completed') {
-      return res.status(400).json({ error: `Cannot delete a bench record with status "${chk.rows[0].status}"` });
+    const bench = await db.findById('bench', id);
+    if (!bench) return res.status(404).json({ error: 'Not found' });
+    if (bench.status === 'Working' || bench.status === 'Project Completed') {
+      return res.status(400).json({ error: `Cannot delete a bench record with status "${bench.status}"` });
     }
-    await pool.query('DELETE FROM bench WHERE id = $1', [id]);
+
+    await db.delete('bench', id);
     res.json({ message: 'Deleted' });
   } catch (err) {
     console.error('Error deleting bench record:', err);
