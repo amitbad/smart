@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '../components/ToastContainer';
+import { ConfirmDialog } from '../components/Dialog';
 
 function Section({ title, items, onAdd, onUpdate, onDelete, renderExtra }) {
   const [name, setName] = useState('');
@@ -49,6 +50,10 @@ export default function Masters() {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Custom confirm dialog state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState({ type: null, id: null, title: '', message: '' });
+
   const loadAll = async () => {
     setLoading(true);
     try {
@@ -72,42 +77,82 @@ export default function Masters() {
   // handlers
   const addDesignation = async (name) => { try { await axios.post('/api/designations', { name }); loadAll(); toast.success('Designation added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
   const updateDesignation = async (id, name) => { try { await axios.put(`/api/designations/${id}`, { name }); loadAll(); toast.success('Designation updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
-  const deleteDesignation = async (id) => { if (!confirm('Delete this designation?')) return; try { await axios.delete(`/api/designations/${id}`); loadAll(); toast.success('Designation deleted'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const deleteDesignation = async (id) => {
+    setPendingDelete({ type: 'designation', id, title: 'Delete Designation?', message: 'Are you sure you want to delete this designation? This action cannot be undone.' });
+    setConfirmOpen(true);
+  };
 
   const addDepartment = async (name) => { try { await axios.post('/api/departments', { name }); loadAll(); toast.success('Department added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
   const updateDepartment = async (id, name) => { try { await axios.put(`/api/departments/${id}`, { name }); loadAll(); toast.success('Department updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
-  const deleteDepartment = async (id) => { if (!confirm('Delete this department?')) return; try { await axios.delete(`/api/departments/${id}`); loadAll(); toast.success('Department deleted'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const deleteDepartment = async (id) => {
+    setPendingDelete({ type: 'department', id, title: 'Delete Department?', message: 'Are you sure you want to delete this department? This action cannot be undone.' });
+    setConfirmOpen(true);
+  };
 
   // Projects handlers
   const addProject = async ({ code, delivery_manager_id }) => { try { await axios.post('/api/projects', { code, delivery_manager_id }); loadAll(); toast.success('Project added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
   const updateProject = async (id, { code, delivery_manager_id }) => { try { await axios.put(`/api/projects/${id}`, { code, delivery_manager_id }); loadAll(); toast.success('Project updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
-  const deleteProject = async (id) => { if (!confirm('Delete this project?')) return; try { await axios.delete(`/api/projects/${id}`); loadAll(); toast.success('Project deleted'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const deleteProject = async (id) => {
+    setPendingDelete({ type: 'project', id, title: 'Delete Project?', message: 'Are you sure you want to delete this project? This action cannot be undone.' });
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    const { type, id } = pendingDelete;
+    try {
+      if (type === 'designation') {
+        await axios.delete(`/api/designations/${id}`);
+        toast.success('Designation deleted');
+      } else if (type === 'department') {
+        await axios.delete(`/api/departments/${id}`);
+        toast.success('Department deleted');
+      } else if (type === 'project') {
+        await axios.delete(`/api/projects/${id}`);
+        toast.success('Project deleted');
+      }
+      await loadAll();
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed');
+    }
+  };
 
   return (
-    <div className="flex-1 overflow-auto">
-      <header className="bg-black border-b border-gray-800 px-6 py-3">
-        <h2 className="text-xl font-bold text-cyan-400">Masters</h2>
-        <p className="text-xs text-gray-500 mt-0.5">Manage master data used across the app</p>
-      </header>
+    <>
+      <div className="flex-1 overflow-auto">
+        <header className="bg-black border-b border-gray-800 px-6 py-3">
+          <h2 className="text-xl font-bold text-cyan-400">Masters</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Manage master data used across the app</p>
+        </header>
 
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {loading ? (
-          <div className="text-gray-400">Loading...</div>
-        ) : (
-          <>
-            <Section title="Designations" items={designations} onAdd={addDesignation} onUpdate={updateDesignation} onDelete={deleteDesignation} />
-            <Section title="Departments" items={departments} onAdd={addDepartment} onUpdate={updateDepartment} onDelete={deleteDepartment} />
-            <ProjectsSection
-              items={projects}
-              members={members}
-              onAdd={addProject}
-              onUpdate={updateProject}
-              onDelete={deleteProject}
-            />
-          </>
-        )}
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {loading ? (
+            <div className="text-gray-400">Loading...</div>
+          ) : (
+            <>
+              <Section title="Designations" items={designations} onAdd={addDesignation} onUpdate={updateDesignation} onDelete={deleteDesignation} />
+              <Section title="Departments" items={departments} onAdd={addDepartment} onUpdate={updateDepartment} onDelete={deleteDepartment} />
+              <ProjectsSection
+                items={projects}
+                members={members}
+                onAdd={addProject}
+                onUpdate={updateProject}
+                onDelete={deleteProject}
+              />
+            </>
+          )}
+        </div>
       </div>
-    </div>
+
+      <ConfirmDialog
+        isOpen={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={confirmDelete}
+        title={pendingDelete.title}
+        message={pendingDelete.message}
+        confirmText="Delete"
+        type="danger"
+      />
+    </>
   );
 }
 

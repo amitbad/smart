@@ -16,6 +16,19 @@ class MongoAdapter {
     };
   }
 
+  // Normalize MongoDB document to include 'id' field for frontend compatibility
+  normalizeDoc(doc) {
+    if (!doc) return doc;
+    if (Array.isArray(doc)) {
+      return doc.map(d => this.normalizeDoc(d));
+    }
+    const obj = doc.toObject ? doc.toObject() : doc;
+    if (obj._id && !obj.id) {
+      obj.id = obj._id.toString();
+    }
+    return obj;
+  }
+
   async query(sql, params) {
     throw new Error('Raw SQL queries not supported in MongoDB adapter. Use model methods instead.');
   }
@@ -42,32 +55,37 @@ class MongoAdapter {
       query = query.skip(options.skip);
     }
 
-    return await query.exec();
+    const results = await query.exec();
+    return this.normalizeDoc(results);
   }
 
   async findOne(collection, filter) {
     const model = this.models[collection];
     if (!model) throw new Error(`Collection ${collection} not found`);
-    return await model.findOne(filter);
+    const result = await model.findOne(filter);
+    return this.normalizeDoc(result);
   }
 
   async findById(collection, id) {
     const model = this.models[collection];
     if (!model) throw new Error(`Collection ${collection} not found`);
-    return await model.findById(id);
+    const result = await model.findById(id);
+    return this.normalizeDoc(result);
   }
 
   async create(collection, data) {
     const model = this.models[collection];
     if (!model) throw new Error(`Collection ${collection} not found`);
     const doc = new model(data);
-    return await doc.save();
+    const result = await doc.save();
+    return this.normalizeDoc(result);
   }
 
   async update(collection, id, data) {
     const model = this.models[collection];
     if (!model) throw new Error(`Collection ${collection} not found`);
-    return await model.findByIdAndUpdate(id, data, { new: true });
+    const result = await model.findByIdAndUpdate(id, data, { new: true });
+    return this.normalizeDoc(result);
   }
 
   async delete(collection, id) {

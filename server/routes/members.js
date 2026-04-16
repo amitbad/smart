@@ -32,12 +32,12 @@ router.get('/', async (req, res) => {
       });
 
       return res.json({
-        members,
+        data: members,
         pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(totalRecords / limit),
+          page: parseInt(page),
+          limit: parseInt(limit),
           totalRecords,
-          pageSize: parseInt(limit)
+          totalPages: Math.ceil(totalRecords / limit)
         }
       });
     }
@@ -206,6 +206,14 @@ router.get('/:id', async (req, res) => {
 router.get('/:id/reportees', async (req, res) => {
   try {
     const { id } = req.params;
+    const db = getDB();
+    const dbType = getDBType();
+
+    if (dbType === 'Mongo') {
+      const reportees = await db.findAll('members', { manager_id: id }, { sort: { name: 1 } });
+      return res.json(reportees);
+    }
+
     const result = await pool.query(`
       SELECT * FROM members
       WHERE manager_id = $1
@@ -219,13 +227,33 @@ router.get('/:id/reportees', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const client = await pool.connect();
   try {
-    const { name, email, designation, level, manager_id, skills } = req.body;
+    const { name, email, designation, level, manager_id, skills, designation_id, department_id } = req.body;
 
     if (!name || !email) {
       return res.status(400).json({ error: 'Name and email are required' });
     }
+
+    const db = getDB();
+    const dbType = getDBType();
+
+    // MongoDB simple create
+    if (dbType === 'Mongo') {
+      const newMember = await db.create('members', {
+        name,
+        email,
+        designation,
+        level: level || 1,
+        manager_id: manager_id || null,
+        designation_id: designation_id || null,
+        department_id: department_id || null
+      });
+
+      return res.status(201).json(newMember);
+    }
+
+    // PostgreSQL with transactions
+    const client = await pool.connect();
 
     await client.query('BEGIN');
 
@@ -256,6 +284,7 @@ router.post('/', async (req, res) => {
     }
 
     await client.query('COMMIT');
+    client.release();
 
     const memberWithSkills = await pool.query(`
       SELECT 
@@ -275,23 +304,41 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(memberWithSkills.rows[0]);
   } catch (error) {
-    await client.query('ROLLBACK');
-    if (error.code === '23505') {
+    if (error.code === '23505' || error.code === 11000) {
       return res.status(409).json({ error: 'Email already exists' });
     }
     console.error('Error creating member:', error);
     res.status(500).json({ error: 'Failed to create member' });
-  } finally {
-    client.release();
   }
 });
 
 router.put('/:id', async (req, res) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
-    const { name, email, designation, level, manager_id, skills } = req.body;
+    const { name, email, designation, level, manager_id, skills, designation_id, department_id } = req.body;
+    const db = getDB();
+    const dbType = getDBType();
 
+    // MongoDB simple update
+    if (dbType === 'Mongo') {
+      const updateData = { updated_at: new Date() };
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (designation) updateData.designation = designation;
+      if (level !== undefined) updateData.level = level;
+      if (manager_id !== undefined) updateData.manager_id = manager_id || null;
+      if (designation_id !== undefined) updateData.designation_id = designation_id || null;
+      if (department_id !== undefined) updateData.department_id = department_id || null;
+
+      const updated = await db.update('members', id, updateData);
+      if (!updated) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      return res.json(updated);
+    }
+
+    // PostgreSQL with transactions
+    const client = await pool.connect();
     await client.query('BEGIN');
 
     // Ensure designation exists in master list (if provided)
@@ -334,6 +381,7 @@ router.put('/:id', async (req, res) => {
     }
 
     await client.query('COMMIT');
+    client.release();
 
     const memberWithSkills = await pool.query(`
       SELECT 
@@ -353,23 +401,50 @@ router.put('/:id', async (req, res) => {
 
     res.json(memberWithSkills.rows[0]);
   } catch (error) {
-    await client.query('ROLLBACK');
-    if (error.code === '23505') {
+    if (error.code === '23505' || error.code === 11000) {
       return res.status(409).json({ error: 'Email already exists' });
     }
     console.error('Error updating member:', error);
     res.status(500).json({ error: 'Failed to update member' });
-  } finally {
-    client.release();
   }
 });
 
 router.delete('/:id', async (req, res) => {
-  const client = await pool.connect();
   try {
     const { id } = req.params;
     const unassign = (req.query.unassign || '').toString().toLowerCase() === 'true';
+    const db = getDB();
+    const dbType = getDBType();
 
+    // MongoDB simple delete
+    if (dbType === 'Mongo') {
+      const dependents = await db.count('members', { manager_id: id });
+
+      if (dependents > 0 && !unassign) {
+        return res.status(409).json({
+          error: 'Member has associated records as Resource Manager',
+          dependents
+        });
+      }
+
+      if (dependents > 0 && unassign) {
+        // Unassign reportees
+        const reportees = await db.findAll('members', { manager_id: id });
+        for (const reportee of reportees) {
+          await db.update('members', reportee._id, { manager_id: null });
+        }
+      }
+
+      const deleted = await db.delete('members', id);
+      if (!deleted) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+
+      return res.json({ message: 'Member deleted successfully', unassigned: dependents });
+    }
+
+    // PostgreSQL with transactions
+    const client = await pool.connect();
     const depResult = await client.query('SELECT COUNT(*)::int AS cnt FROM members WHERE manager_id = $1', [id]);
     const dependents = depResult.rows[0]?.cnt || 0;
 
@@ -394,13 +469,11 @@ router.delete('/:id', async (req, res) => {
     }
 
     await client.query('COMMIT');
+    client.release();
     res.json({ message: 'Member deleted successfully', unassigned: dependents });
   } catch (error) {
-    await client.query('ROLLBACK');
     console.error('Error deleting member:', error);
     res.status(500).json({ error: 'Failed to delete member' });
-  } finally {
-    client.release();
   }
 });
 

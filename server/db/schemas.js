@@ -27,18 +27,20 @@ const memberSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   phone: String,
+  designation: String,
   designation_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Designation' },
   department_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
-  level: Number,
+  level: { type: String, default: '1' },
   manager_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
 });
 
 const actionItemSchema = new mongoose.Schema({
   action_date: { type: Date, required: true },
   description: { type: String, required: true },
   priority: { type: String, enum: ['Low', 'Medium', 'High', 'Critical'], default: 'Medium' },
-  status: { type: String, enum: ['Pending', 'In Progress', 'Completed', 'Deferred'], default: 'Pending' },
+  status: { type: String, enum: ['Pending', 'Not Started', 'In Progress', 'Completed', 'Deferred', 'Put On Hold'], default: 'Pending' },
   dependency_member_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
   created_at: { type: Date, default: Date.now }
 });

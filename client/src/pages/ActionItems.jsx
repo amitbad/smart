@@ -74,16 +74,35 @@ export default function ActionItems() {
   const todaysItems = useMemo(() => items.filter(it => it.action_date === today), [items, today]);
 
   const openAdd = () => { setEditing(null); setForm({ action_date: today, description: '', priority: 'Medium', status: 'Not Started', dependency_member_ids: [] }); setModalOpen(true); setLockModal(true); };
-  const openEdit = (it) => { setEditing(it); setForm({ action_date: it.action_date, description: it.description, priority: it.priority, status: it.status, dependency_member_ids: it.dependency_member_ids || [] }); setModalOpen(true); setLockModal(true); };
+  const openEdit = (it) => {
+    setEditing(it);
+    setForm({
+      action_date: it.action_date ? new Date(it.action_date).toISOString().slice(0, 10) : today,
+      description: it.description,
+      priority: it.priority,
+      status: it.status,
+      dependency_member_ids: it.dependency_member_ids || []
+    });
+    setModalOpen(true);
+    setLockModal(true);
+  };
 
   const handleSave = async () => {
     if (!form.action_date || !form.description) { toast.error('Date and Action Item are required'); return; }
     try {
+      const payload = {
+        action_date: form.action_date,
+        description: form.description,
+        priority: form.priority,
+        status: form.status,
+        // server expects single dependency_member_id; send first selected or null
+        dependency_member_id: form.dependency_member_ids?.[0] || null
+      };
       if (editing) {
-        await axios.put(`/api/action-items/${editing.id}`, form);
+        await axios.put(`/api/action-items/${editing.id}`, payload);
         toast.success('Action item updated');
       } else {
-        await axios.post('/api/action-items', form);
+        await axios.post('/api/action-items', payload);
         toast.success('Action item added');
       }
       setModalOpen(false);
@@ -297,7 +316,7 @@ export default function ActionItems() {
                 value={form.dependency_member_ids[0] || ''}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setForm(f => ({ ...f, dependency_member_ids: v ? [parseInt(v)] : [] }));
+                  setForm(f => ({ ...f, dependency_member_ids: v ? [v] : [] }));
                 }}
                 className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm"
               >
