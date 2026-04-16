@@ -1,6 +1,6 @@
 import express from 'express';
 import { getDB, getDBType } from '../db/index.js';
-import { encryptUrl, decryptUrl } from '../utils/encryption.js';
+import { encryptUrl, safeDecryptUrl } from '../utils/encryption.js';
 
 const router = express.Router();
 
@@ -32,10 +32,10 @@ router.get('/', async (req, res) => {
       links = await db.findAll('importantLinks', {}, { sort: { created_at: -1 } });
     }
 
-    // Decrypt URLs before sending to client
+    // Decrypt URLs before sending to client (handles both encrypted and plain text)
     const decryptedLinks = links.map(link => ({
       ...link,
-      link_url: decryptUrl(link.link_url)
+      link_url: safeDecryptUrl(link.link_url)
     }));
 
     res.json(decryptedLinks);
@@ -57,7 +57,7 @@ router.get('/:id', async (req, res) => {
     }
 
     // Decrypt URL before sending
-    link.link_url = decryptUrl(link.link_url);
+    link.link_url = safeDecryptUrl(link.link_url);
 
     res.json(link);
   } catch (error) {
@@ -88,7 +88,7 @@ router.post('/', async (req, res) => {
     });
 
     // Decrypt URL before sending response
-    newLink.link_url = decryptUrl(newLink.link_url);
+    newLink.link_url = safeDecryptUrl(newLink.link_url);
 
     res.status(201).json(newLink);
   } catch (error) {
@@ -125,7 +125,7 @@ router.put('/:id', async (req, res) => {
     }
 
     // Decrypt URL before sending response
-    updated.link_url = decryptUrl(updated.link_url);
+    updated.link_url = safeDecryptUrl(updated.link_url);
 
     res.json(updated);
   } catch (error) {

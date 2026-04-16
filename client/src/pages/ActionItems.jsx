@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, Filter, Bell, Copy } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, Filter, Bell, Copy, ExternalLink, Eye } from 'lucide-react';
 import axios from 'axios';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
 import { useToast } from '../components/ToastContainer';
@@ -27,6 +27,8 @@ export default function ActionItems() {
   const notifRef = useRef(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [toDelete, setToDelete] = useState(null);
+  const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -87,6 +89,11 @@ export default function ActionItems() {
     });
     setModalOpen(true);
     setLockModal(true);
+  };
+
+  const openViewDetails = (it) => {
+    setViewingItem(it);
+    setViewDetailsOpen(true);
   };
 
   const handleSave = async () => {
@@ -251,7 +258,29 @@ export default function ActionItems() {
                   <tbody className="divide-y divide-gray-800">
                     {rows.map(it => (
                       <tr key={it.id} className="hover:bg-gray-900">
-                        <td className="px-4 py-2 max-w-[420px] truncate" title={it.description}>{it.description}</td>
+                        <td className="px-4 py-2 max-w-[420px]">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => openViewDetails(it)}
+                              className="text-left truncate hover:text-cyan-400 transition-colors flex-1"
+                              title="Click to view details"
+                            >
+                              {it.description}
+                            </button>
+                            {it.reference_link && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(it.reference_link, '_blank', 'noopener,noreferrer');
+                                }}
+                                className="text-cyan-400 hover:text-cyan-300 flex-shrink-0"
+                                title="Open reference link"
+                              >
+                                <ExternalLink size={16} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-4 py-2"><Pill text={it.priority} kind="priority" /></td>
                         <td className="px-4 py-2 text-gray-300">
                           {it.dependency_member_ids?.length ? (() => {
@@ -360,6 +389,106 @@ export default function ActionItems() {
         confirmText="Delete"
         type="danger"
       />
+
+      {/* View Details Modal (Read-Only) */}
+      <Dialog
+        isOpen={viewDetailsOpen}
+        onClose={() => setViewDetailsOpen(false)}
+        title="Action Item Details"
+        size="lg"
+      >
+        {viewingItem && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Date</label>
+                <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
+                  {new Date(viewingItem.action_date).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
+                  <Pill text={viewingItem.priority} kind="priority" />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
+                  <Pill text={viewingItem.status} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Dependency On</label>
+                <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-gray-300">
+                  {viewingItem.dependency_member_ids?.length ? (() => {
+                    const id = viewingItem.dependency_member_ids[0];
+                    const m = members.find(mm => mm.id === id);
+                    return m ? `${m.name}${m.designation ? ` (${m.designation})` : ''}` : `#${id}`;
+                  })() : (
+                    <span className="text-gray-500">None</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Action Item</label>
+              <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm whitespace-pre-wrap">
+                {viewingItem.description}
+              </div>
+            </div>
+
+            {viewingItem.reference_link && (
+              <div>
+                <label className="block text-sm font-medium text-gray-400 mb-1">Reference Link</label>
+                <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
+                  <a
+                    href={viewingItem.reference_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyan-400 hover:text-cyan-300 flex items-center gap-2"
+                  >
+                    <ExternalLink size={16} />
+                    <span className="truncate">{viewingItem.reference_link}</span>
+                  </a>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-4 border-t border-gray-800">
+              <div className="text-xs text-gray-500">
+                Created: {new Date(viewingItem.created_at || viewingItem.action_date).toLocaleString()}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setViewDetailsOpen(false);
+                    openEdit(viewingItem);
+                  }}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm flex items-center gap-2"
+                >
+                  <Edit2 size={16} />
+                  Edit
+                </button>
+                <button
+                  onClick={() => setViewDetailsOpen(false)}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

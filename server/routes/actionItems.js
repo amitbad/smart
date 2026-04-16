@@ -1,6 +1,6 @@
 import express from 'express';
 import { getDB, getDBType } from '../db/index.js';
-import { encryptUrl, decryptUrl } from '../utils/encryption.js';
+import { encryptUrl, safeDecryptUrl } from '../utils/encryption.js';
 
 const router = express.Router();
 
@@ -19,10 +19,10 @@ router.get('/', async (req, res) => {
 
     const actionItems = await db.findAll('actionItems', filter, { sort: { action_date: -1, created_at: -1 } });
 
-    // Decrypt reference links before sending to client
+    // Decrypt reference links before sending to client (handles both encrypted and plain text)
     const decryptedItems = actionItems.map(item => ({
       ...item,
-      reference_link: item.reference_link ? decryptUrl(item.reference_link) : null
+      reference_link: item.reference_link ? safeDecryptUrl(item.reference_link) : null
     }));
 
     res.json(decryptedItems);
@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
 
     // Decrypt reference link before sending response
     if (newItem.reference_link) {
-      newItem.reference_link = decryptUrl(newItem.reference_link);
+      newItem.reference_link = safeDecryptUrl(newItem.reference_link);
     }
 
     res.status(201).json(newItem);
@@ -86,7 +86,7 @@ router.put('/:id', async (req, res) => {
 
     // Decrypt reference link before sending response
     if (updated.reference_link) {
-      updated.reference_link = decryptUrl(updated.reference_link);
+      updated.reference_link = safeDecryptUrl(updated.reference_link);
     }
 
     res.json(updated);

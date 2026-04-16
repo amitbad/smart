@@ -1,7 +1,7 @@
 import express from 'express';
 import pool from '../config/database.js';
 import { getDB, getDBType } from '../db/index.js';
-import { encrypt, decrypt } from '../utils/encryption.js';
+import { encrypt, safeDecrypt } from '../utils/encryption.js';
 
 const router = express.Router();
 
@@ -32,10 +32,10 @@ router.get('/', async (req, res) => {
         populate: ['manager_id', 'designation_id', 'department_id']
       });
 
-      // Decrypt emails before sending to client
+      // Decrypt emails before sending to client (handles both encrypted and plain text)
       const decryptedMembers = members.map(m => ({
         ...m,
-        email: m.email ? decrypt(m.email) : m.email
+        email: m.email ? safeDecrypt(m.email) : m.email
       }));
 
       return res.json({
@@ -179,7 +179,7 @@ router.get('/:id', async (req, res) => {
 
       // Decrypt email before sending
       if (member.email) {
-        member.email = decrypt(member.email);
+        member.email = safeDecrypt(member.email);
       }
 
       return res.json(member);
@@ -226,7 +226,7 @@ router.get('/:id/reportees', async (req, res) => {
       // Decrypt emails before sending
       const decryptedReportees = reportees.map(r => ({
         ...r,
-        email: r.email ? decrypt(r.email) : r.email
+        email: r.email ? safeDecrypt(r.email) : r.email
       }));
       return res.json(decryptedReportees);
     }
@@ -270,7 +270,7 @@ router.post('/', async (req, res) => {
       });
 
       // Decrypt email before sending response
-      newMember.email = decrypt(newMember.email);
+      newMember.email = safeDecrypt(newMember.email);
 
       return res.status(201).json(newMember);
     }
@@ -360,7 +360,7 @@ router.put('/:id', async (req, res) => {
 
       // Decrypt email before sending response
       if (updated.email) {
-        updated.email = decrypt(updated.email);
+        updated.email = safeDecrypt(updated.email);
       }
 
       return res.json(updated);
