@@ -43,6 +43,10 @@ const actionItemSchema = new mongoose.Schema({
   status: { type: String, enum: ['Pending', 'Not Started', 'In Progress', 'Completed', 'Deferred', 'Put On Hold'], default: 'Pending' },
   dependency_member_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
   reference_link: { type: String, default: null },
+  comments: [{
+    text: { type: String, required: true },
+    created_at: { type: Date, default: Date.now }
+  }],
   created_at: { type: Date, default: Date.now }
 });
 

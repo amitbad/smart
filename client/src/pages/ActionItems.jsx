@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye, MessageSquarePlus, MessageSquare } from 'lucide-react';
 import axios from 'axios';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
 import { useToast } from '../components/ToastContainer';
@@ -30,6 +30,14 @@ export default function ActionItems() {
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
   const [collapsedDates, setCollapsedDates] = useState(new Set());
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentingItem, setCommentingItem] = useState(null);
+  const [newComment, setNewComment] = useState('');
+  const [savingComment, setSavingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [commentDeleteConfirmOpen, setCommentDeleteConfirmOpen] = useState(false);
+  const [commentToDelete, setCommentToDelete] = useState(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -52,6 +60,92 @@ export default function ActionItems() {
     window.addEventListener('click', onClick);
     return () => window.removeEventListener('click', onClick);
   }, [notifOpen]);
+
+  const startEditComment = (comment) => {
+    const commentId = comment._id || comment.id;
+    setEditingCommentId(commentId);
+    setEditingCommentText(comment.text || '');
+  };
+
+  const cancelEditComment = () => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  };
+
+  const handleUpdateComment = async () => {
+    if (!commentingItem || !editingCommentId || !editingCommentText.trim()) {
+      toast.error('Comment cannot be empty');
+      return;
+    }
+    setSavingComment(true);
+    try {
+      const res = await axios.put(`/api/action-items/${commentingItem.id}/comments/${editingCommentId}`, {
+        text: editingCommentText.trim()
+      });
+      const updated = res.data;
+      setItems(prev => prev.map(it => it.id === updated.id ? updated : it));
+      setCommentingItem(updated);
+      setViewingItem(prev => prev?.id === updated.id ? updated : prev);
+      setEditingCommentId(null);
+      setEditingCommentText('');
+      toast.success('Comment updated');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to update comment');
+    } finally {
+      setSavingComment(false);
+    }
+  };
+
+  const requestDeleteComment = (comment) => {
+    setCommentToDelete(comment);
+    setCommentDeleteConfirmOpen(true);
+  };
+
+  const handleDeleteComment = async () => {
+    if (!commentingItem || !commentToDelete) return;
+    const commentId = commentToDelete._id || commentToDelete.id;
+    try {
+      const res = await axios.delete(`/api/action-items/${commentingItem.id}/comments/${commentId}`);
+      const updated = res.data;
+      setItems(prev => prev.map(it => it.id === updated.id ? updated : it));
+      setCommentingItem(updated);
+      setViewingItem(prev => prev?.id === updated.id ? updated : prev);
+      setCommentDeleteConfirmOpen(false);
+      setCommentToDelete(null);
+      toast.success('Comment deleted');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to delete comment');
+    }
+  };
+
+  const openComments = (it) => {
+    setCommentingItem(it);
+    setNewComment('');
+    setEditingCommentId(null);
+    setEditingCommentText('');
+    setCommentsOpen(true);
+  };
+
+  const handleAddComment = async () => {
+    if (!commentingItem || !newComment.trim()) {
+      toast.error('Comment cannot be empty');
+      return;
+    }
+    setSavingComment(true);
+    try {
+      const res = await axios.post(`/api/action-items/${commentingItem.id}/comments`, { text: newComment.trim() });
+      const updated = res.data;
+      setItems(prev => prev.map(it => it.id === updated.id ? updated : it));
+      setCommentingItem(updated);
+      setViewingItem(prev => prev?.id === updated.id ? updated : prev);
+      setNewComment('');
+      toast.success('Comment added');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to add comment');
+    } finally {
+      setSavingComment(false);
+    }
+  };
 
   const fetchMembers = async () => {
     try { const res = await axios.get('/api/members?limit=1000'); setMembers(res.data.data || []); } catch { }
@@ -353,6 +447,13 @@ export default function ActionItems() {
                             <td className="px-4 py-2">
                               <div className="flex items-center gap-2">
                                 <button onClick={() => openEdit(it)} className="text-gray-400 hover:text-white" title="Edit"><Edit2 size={16} /></button>
+                                <button
+                                  onClick={() => openComments(it)}
+                                  className={`${it.comments?.length ? 'text-cyan-400 hover:text-cyan-300' : 'text-gray-400 hover:text-white'}`}
+                                  title={it.comments?.length ? `Comments (${it.comments.length})` : 'Add comment'}
+                                >
+                                  {it.comments?.length ? <MessageSquare size={16} /> : <MessageSquarePlus size={16} />}
+                                </button>
                                 <div className="relative inline-block">
                                   <button className="text-gray-400 hover:text-white flex items-center gap-1" title="Update Priority">
                                     <Filter size={16} /><ChevronDown size={14} />
@@ -440,6 +541,98 @@ export default function ActionItems() {
           </div>
         </div>
       </Dialog>
+
+      <Dialog
+        isOpen={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        title="Action Item Notes"
+        size="lg"
+      >
+        <div className="space-y-4">
+          {commentingItem && (
+            <>
+              <div className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm whitespace-pre-wrap">
+                {commentingItem.description}
+              </div>
+
+              <div className="space-y-2 max-h-72 overflow-y-auto">
+                {commentingItem.comments?.length ? (
+                  commentingItem.comments
+                    .slice()
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                    .map((comment, index) => {
+                      const commentId = comment._id || comment.id || `${comment.created_at}-${index}`;
+                      const isEditingComment = editingCommentId === commentId;
+                      return (
+                        <div key={`${comment.created_at}-${index}`} className="bg-gray-900 border border-gray-800 rounded p-3">
+                          <div className="flex items-start justify-between gap-3 mb-2">
+                            <div className="text-xs text-gray-500">
+                              {new Date(comment.created_at).toLocaleString()}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => startEditComment(comment)}
+                                className="text-gray-400 hover:text-white"
+                                title="Edit note"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                onClick={() => requestDeleteComment(comment)}
+                                className="text-gray-400 hover:text-red-400"
+                                title="Delete note"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          {isEditingComment ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                                rows={4}
+                                className="w-full bg-black border border-gray-800 rounded px-3 py-2 text-sm"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button onClick={cancelEditComment} className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded text-xs">Cancel</button>
+                                <button onClick={handleUpdateComment} disabled={savingComment} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs disabled:opacity-50">
+                                  {savingComment ? 'Saving...' : 'Update'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-sm whitespace-pre-wrap">{comment.text}</div>
+                          )}
+                        </div>
+                      );
+                    })
+                ) : (
+                  <div className="text-sm text-gray-500 text-center py-6">No notes added yet</div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm mb-1">Add Note</label>
+                <textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  rows={4}
+                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm"
+                  placeholder="Add your comment or update here..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setCommentsOpen(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm">Close</button>
+                <button onClick={handleAddComment} disabled={savingComment} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm disabled:opacity-50">
+                  {savingComment ? 'Saving...' : 'Add Note'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </Dialog>
       <ConfirmDialog
         isOpen={confirmOpen}
         onClose={() => setConfirmOpen(false)}
@@ -447,6 +640,19 @@ export default function ActionItems() {
         title="Confirm Deletion"
         message={toDelete ? `This action is currently "${toDelete.status}". Do you want to delete this item dated ${toDelete.action_date}?` : ''}
         confirmText="Delete"
+        type="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={commentDeleteConfirmOpen}
+        onClose={() => {
+          setCommentDeleteConfirmOpen(false);
+          setCommentToDelete(null);
+        }}
+        onConfirm={handleDeleteComment}
+        title="Delete Note"
+        message={commentToDelete ? `Do you want to delete this note added on ${new Date(commentToDelete.created_at).toLocaleString()}? This action cannot be undone.` : ''}
+        confirmText="Delete Note"
         type="danger"
       />
 

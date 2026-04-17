@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { action_date, description, priority, status, dependency_member_id, reference_link } = req.body;
+    const { action_date, description, priority, status, dependency_member_id, reference_link, comments } = req.body;
     if (!action_date || !description) {
       return res.status(400).json({ error: 'Date and description are required' });
     }
@@ -49,7 +49,8 @@ router.post('/', async (req, res) => {
       priority: priority || 'Medium',
       status: status || 'Pending',
       dependency_member_id: dependency_member_id || null,
-      reference_link: encryptedLink
+      reference_link: encryptedLink,
+      comments: Array.isArray(comments) ? comments : []
     });
 
     // Decrypt reference link before sending response
@@ -67,7 +68,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { action_date, description, priority, status, dependency_member_id, reference_link } = req.body;
+    const { action_date, description, priority, status, dependency_member_id, reference_link, comments } = req.body;
     const db = getDB();
 
     const updateData = { updated_at: new Date() };
@@ -76,6 +77,7 @@ router.put('/:id', async (req, res) => {
     if (priority) updateData.priority = priority;
     if (status) updateData.status = status;
     if (dependency_member_id !== undefined) updateData.dependency_member_id = dependency_member_id || null;
+    if (comments !== undefined) updateData.comments = Array.isArray(comments) ? comments : [];
     if (reference_link !== undefined) {
       // Encrypt reference link if provided, otherwise set to null
       updateData.reference_link = reference_link ? encryptUrl(reference_link) : null;
@@ -93,6 +95,112 @@ router.put('/:id', async (req, res) => {
   } catch (err) {
     console.error('Error updating action item:', err);
     res.status(500).json({ error: 'Failed to update action item' });
+  }
+});
+
+router.post('/:id/comments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+
+    const db = getDB();
+    const dbType = getDBType();
+    const newComment = {
+      text: text.trim(),
+      created_at: new Date()
+    };
+
+    if (dbType === 'Mongo') {
+      const item = await db.findById('actionItems', id);
+      if (!item) return res.status(404).json({ error: 'Not found' });
+      const updatedComments = [...(item.comments || []), newComment];
+      const updated = await db.update('actionItems', id, {
+        comments: updatedComments,
+        updated_at: new Date()
+      });
+      if (updated.reference_link) {
+        updated.reference_link = safeDecryptUrl(updated.reference_link);
+      }
+      return res.json(updated);
+    }
+
+    return res.status(501).json({ error: 'PostgreSQL path not implemented for action item comments in this route' });
+  } catch (err) {
+    console.error('Error adding action item comment:', err);
+    res.status(500).json({ error: 'Failed to add comment' });
+  }
+});
+
+router.put('/:id/comments/:commentId', async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+
+    const db = getDB();
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'PostgreSQL path not implemented for action item comments in this route' });
+    }
+
+    const item = await db.findById('actionItems', id);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+
+    const updatedComments = (item.comments || []).map(comment => {
+      const currentId = comment._id?.toString?.() || comment.id?.toString?.();
+      if (currentId === commentId) {
+        return { ...comment, text: text.trim() };
+      }
+      return comment;
+    });
+
+    const updated = await db.update('actionItems', id, {
+      comments: updatedComments,
+      updated_at: new Date()
+    });
+    if (updated.reference_link) {
+      updated.reference_link = safeDecryptUrl(updated.reference_link);
+    }
+    return res.json(updated);
+  } catch (err) {
+    console.error('Error updating action item comment:', err);
+    res.status(500).json({ error: 'Failed to update comment' });
+  }
+});
+
+router.delete('/:id/comments/:commentId', async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+    const db = getDB();
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'PostgreSQL path not implemented for action item comments in this route' });
+    }
+
+    const item = await db.findById('actionItems', id);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+
+    const updatedComments = (item.comments || []).filter(comment => {
+      const currentId = comment._id?.toString?.() || comment.id?.toString?.();
+      return currentId !== commentId;
+    });
+
+    const updated = await db.update('actionItems', id, {
+      comments: updatedComments,
+      updated_at: new Date()
+    });
+    if (updated.reference_link) {
+      updated.reference_link = safeDecryptUrl(updated.reference_link);
+    }
+    return res.json(updated);
+  } catch (err) {
+    console.error('Error deleting action item comment:', err);
+    res.status(500).json({ error: 'Failed to delete comment' });
   }
 });
 
