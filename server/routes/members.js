@@ -306,6 +306,24 @@ router.post('/', async (req, res) => {
         department_id: department_id || null
       });
 
+      if (skills && skills.length > 0) {
+        for (const skillId of skills) {
+          await db.create('memberSkills', {
+            member_id: newMember.id,
+            skill_id: skillId
+          });
+        }
+      }
+
+      const skillsData = await db.findAll('memberSkills', { member_id: newMember.id });
+      const skillIds = skillsData.map(ms => ms.skill_id);
+      const memberSkills = [];
+      for (const skillId of skillIds) {
+        const skill = await db.findById('skills', skillId);
+        if (skill) memberSkills.push(skill);
+      }
+      newMember.skills = memberSkills;
+
       // Decrypt email before sending response
       newMember.email = safeDecrypt(newMember.email);
 
