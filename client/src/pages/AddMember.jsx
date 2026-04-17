@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Save, X, Plus } from 'lucide-react';
 import axios from 'axios';
@@ -31,12 +31,24 @@ export default function AddMember() {
   const [skillDropdownOpen, setSkillDropdownOpen] = useState(false);
   const [confirmRemoveSkill, setConfirmRemoveSkill] = useState(false);
   const [skillToRemove, setSkillToRemove] = useState(null);
+  const skillDropdownRef = useRef(null);
 
   useEffect(() => {
     fetchSkills();
     fetchManagers();
     fetchDesignations();
   }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (skillDropdownOpen && skillDropdownRef.current && !skillDropdownRef.current.contains(e.target)) {
+        setSkillDropdownOpen(false);
+      }
+    };
+
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, [skillDropdownOpen]);
 
   const fetchSkills = async () => {
     try {
@@ -74,6 +86,7 @@ export default function AddMember() {
     if (!selectedSkills.includes(skillId)) {
       setSelectedSkills(prev => [...prev, skillId]);
     }
+    setSkillDropdownOpen(true);
   };
 
   const requestRemoveSkill = (skillId) => {
@@ -335,10 +348,13 @@ export default function AddMember() {
             </div>
 
             {/* Multi-select Dropdown */}
-            <div className="relative mb-4">
+            <div className="relative mb-4" ref={skillDropdownRef}>
               <button
                 type="button"
-                onClick={() => setSkillDropdownOpen(!skillDropdownOpen)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSkillDropdownOpen(!skillDropdownOpen);
+                }}
                 className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-left flex items-center justify-between hover:border-cyan-600 focus:outline-none focus:border-cyan-600"
               >
                 <span className="text-gray-400">Add skills...</span>
@@ -346,7 +362,10 @@ export default function AddMember() {
               </button>
 
               {skillDropdownOpen && (
-                <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded border border-gray-800 bg-black shadow-lg">
+                <div
+                  className="absolute z-20 mt-2 w-full max-h-60 overflow-auto rounded-md border border-gray-700 bg-gray-950 shadow-xl ring-1 ring-gray-700/60"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   <div className="py-1">
                     {availableSkills.length === 0 ? (
                       <div className="px-3 py-2 text-sm text-gray-500">No skills available. Add skills in Masters page.</div>
@@ -357,8 +376,9 @@ export default function AddMember() {
                           <button
                             type="button"
                             key={skill.id}
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => handleSkillAdd(skill.id)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900"
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-800 focus:bg-gray-800"
                           >
                             {skill.name}
                           </button>
