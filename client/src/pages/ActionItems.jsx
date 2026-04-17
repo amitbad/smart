@@ -406,7 +406,7 @@ export default function ActionItems() {
                   </div>
                 </div>
                 {!isCollapsed && (
-                  <div className="bg-black border border-gray-800 rounded overflow-hidden">
+                  <div className="bg-black border border-gray-800 rounded overflow-visible">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-900 text-xs text-gray-500">
                         <tr>
@@ -442,6 +442,19 @@ export default function ActionItems() {
                                     title="Open reference link"
                                   >
                                     <ExternalLink size={16} />
+                                  </button>
+                                )}
+                                {it.comments?.length > 0 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openComments(it);
+                                    }}
+                                    className="flex items-center gap-1 px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded text-xs hover:bg-cyan-600/30 flex-shrink-0"
+                                    title={`${it.comments.length} ${it.comments.length === 1 ? 'note' : 'notes'} available`}
+                                  >
+                                    <MessageSquare size={14} />
+                                    <span>{it.comments.length}</span>
                                   </button>
                                 )}
                               </div>
@@ -513,7 +526,7 @@ export default function ActionItems() {
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-2">
+                            <td className="px-4 py-2 overflow-visible">
                               <div className="flex items-center gap-2">
                                 <div className="relative">
                                   <button
@@ -528,7 +541,7 @@ export default function ActionItems() {
                                   </button>
                                   {openActionMenuId === it.id && (
                                     <div
-                                      className="absolute right-0 mt-1 w-44 bg-black border border-gray-800 rounded shadow-lg z-20 py-1"
+                                      className="absolute right-0 mt-1 w-44 bg-black border border-gray-800 rounded shadow-lg z-50 py-1"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <button onClick={() => { setOpenActionMenuId(null); openViewDetails(it); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2">
@@ -659,15 +672,17 @@ export default function ActionItems() {
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() => startEditComment(comment)}
-                                className="text-gray-400 hover:text-white"
-                                title="Edit note"
+                                disabled={commentingItem.status === 'Completed'}
+                                className={`text-gray-400 ${commentingItem.status === 'Completed' ? 'opacity-40 cursor-not-allowed' : 'hover:text-white'}`}
+                                title={commentingItem.status === 'Completed' ? 'Notes cannot be edited for completed items' : 'Edit note'}
                               >
                                 <Edit2 size={14} />
                               </button>
                               <button
                                 onClick={() => requestDeleteComment(comment)}
-                                className="text-gray-400 hover:text-red-400"
-                                title="Delete note"
+                                disabled={commentingItem.status === 'Completed'}
+                                className={`text-gray-400 ${commentingItem.status === 'Completed' ? 'opacity-40 cursor-not-allowed' : 'hover:text-red-400'}`}
+                                title={commentingItem.status === 'Completed' ? 'Notes cannot be deleted for completed items' : 'Delete note'}
                               >
                                 <Trash2 size={14} />
                               </button>

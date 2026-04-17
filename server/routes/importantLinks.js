@@ -71,8 +71,8 @@ router.post('/', async (req, res) => {
   try {
     const { link_name, link_url, purpose, created_by } = req.body;
 
-    if (!link_name || !link_url || !purpose) {
-      return res.status(400).json({ error: 'Link name, URL, and purpose are required' });
+    if (!link_name || !link_url) {
+      return res.status(400).json({ error: 'Link name and URL are required' });
     }
 
     const db = getDB();
@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
     const newLink = await db.create('importantLinks', {
       link_name,
       link_url: encryptedUrl,
-      purpose,
+      purpose: purpose || null,
       created_by: created_by || null
     });
 
@@ -103,8 +103,8 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { link_name, link_url, purpose, created_by } = req.body;
 
-    if (!link_name || !link_url || !purpose) {
-      return res.status(400).json({ error: 'Link name, URL, and purpose are required' });
+    if (!link_name || !link_url) {
+      return res.status(400).json({ error: 'Link name and URL are required' });
     }
 
     const db = getDB();
@@ -115,7 +115,7 @@ router.put('/:id', async (req, res) => {
     const updated = await db.update('importantLinks', id, {
       link_name,
       link_url: encryptedUrl,
-      purpose,
+      purpose: purpose || null,
       created_by: created_by || null,
       updated_at: new Date()
     });

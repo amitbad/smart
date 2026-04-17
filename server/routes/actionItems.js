@@ -150,6 +150,9 @@ router.put('/:id/comments/:commentId', async (req, res) => {
 
     const item = await db.findById('actionItems', id);
     if (!item) return res.status(404).json({ error: 'Not found' });
+    if (item.status === 'Completed') {
+      return res.status(400).json({ error: 'Cannot edit notes for a completed action item' });
+    }
 
     const updatedComments = (item.comments || []).map(comment => {
       const currentId = comment._id?.toString?.() || comment.id?.toString?.();
@@ -184,6 +187,9 @@ router.delete('/:id/comments/:commentId', async (req, res) => {
 
     const item = await db.findById('actionItems', id);
     if (!item) return res.status(404).json({ error: 'Not found' });
+    if (item.status === 'Completed') {
+      return res.status(400).json({ error: 'Cannot delete notes for a completed action item' });
+    }
 
     const updatedComments = (item.comments || []).filter(comment => {
       const currentId = comment._id?.toString?.() || comment.id?.toString?.();

@@ -73,7 +73,7 @@ const benchSchema = new mongoose.Schema({
 const importantLinkSchema = new mongoose.Schema({
   link_name: { type: String, required: true },
   link_url: { type: String, required: true },
-  purpose: { type: String, required: true },
+  purpose: { type: String, default: null },
   created_by: String,
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }

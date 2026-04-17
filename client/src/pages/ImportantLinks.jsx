@@ -55,8 +55,8 @@ export default function ImportantLinks() {
   };
 
   const handleSave = async () => {
-    if (!form.link_name || !form.link_url || !form.purpose) {
-      toast.error('Link name, URL, and purpose are required');
+    if (!form.link_name || !form.link_url) {
+      toast.error('Link name and URL are required');
       return;
     }
 
@@ -64,7 +64,7 @@ export default function ImportantLinks() {
       const payload = {
         link_name: form.link_name,
         link_url: form.link_url,
-        purpose: form.purpose,
+        purpose: form.purpose || null,
         created_by: form.created_by || null
       };
 
@@ -155,8 +155,8 @@ export default function ImportantLinks() {
                       </a>
                     </td>
                     <td className="px-4 py-2 max-w-md">
-                      <div className="line-clamp-2" title={link.purpose}>
-                        {link.purpose}
+                      <div className="line-clamp-2" title={link.purpose || ''}>
+                        {link.purpose || <span className="text-xs text-gray-500">—</span>}
                       </div>
                     </td>
                     <td className="px-4 py-2">{link.created_by || <span className="text-xs text-gray-500">—</span>}</td>
@@ -202,7 +202,7 @@ export default function ImportantLinks() {
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Purpose</label>
+            <label className="block text-sm mb-1">Purpose (optional)</label>
             <textarea
               value={form.purpose}
               onChange={(e) => setForm((f) => ({ ...f, purpose: e.target.value }))}
