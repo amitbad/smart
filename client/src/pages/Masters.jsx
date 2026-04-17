@@ -48,6 +48,7 @@ export default function Masters() {
   const [departments, setDepartments] = useState([]);
   const [projects, setProjects] = useState([]);
   const [skills, setSkills] = useState([]);
+  const [goalCategories, setGoalCategories] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,17 +59,19 @@ export default function Masters() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [dsg, dep, pro, skl, mem] = await Promise.all([
+      const [dsg, dep, pro, skl, gcat, mem] = await Promise.all([
         axios.get('/api/designations'),
         axios.get('/api/departments'),
         axios.get('/api/projects'),
         axios.get('/api/skills'),
+        axios.get('/api/goal-categories'),
         axios.get('/api/members?limit=1000')
       ]);
       setDesignations(dsg.data || []);
       setDepartments(dep.data || []);
       setProjects(pro.data || []);
       setSkills(skl.data || []);
+      setGoalCategories(gcat.data || []);
       setMembers(mem.data?.data || []);
     } catch (e) {
       toast.error('Failed to load masters');
@@ -144,6 +147,32 @@ export default function Masters() {
     }
   };
 
+  // Goal Categories handlers
+  const addGoalCategory = async (name) => { try { await axios.post('/api/goal-categories', { name }); loadAll(); toast.success('Category added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const updateGoalCategory = async (id, name) => { try { await axios.put(`/api/goal-categories/${id}`, { name }); loadAll(); toast.success('Category updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const deleteGoalCategory = async (id) => {
+    try {
+      // Check if goal category is assigned to goals
+      const response = await axios.get(`/api/goal-categories/${id}/assignments`);
+      const { isAssigned, count } = response.data;
+
+      let message = 'Are you sure you want to delete this category?';
+      if (isAssigned) {
+        message = `This category is assigned to ${count} goal${count > 1 ? 's' : ''}. Deleting this will remove it from all goals. Do you want to continue?`;
+      }
+
+      setPendingDelete({
+        type: 'goalCategory',
+        id,
+        title: 'Delete Category?',
+        message
+      });
+      setConfirmOpen(true);
+    } catch (e) {
+      toast.error('Failed to check category assignments');
+    }
+  };
+
   const confirmDelete = async () => {
     const { type, id } = pendingDelete;
     try {
@@ -159,6 +188,9 @@ export default function Masters() {
       } else if (type === 'skill') {
         await axios.delete(`/api/skills/${id}`);
         toast.success('Skill deleted');
+      } else if (type === 'goalCategory') {
+        await axios.delete(`/api/goal-categories/${id}`);
+        toast.success('Category deleted');
       }
       await loadAll();
     } catch (e) {
@@ -182,6 +214,7 @@ export default function Masters() {
               <Section title="Designations" items={designations} onAdd={addDesignation} onUpdate={updateDesignation} onDelete={deleteDesignation} />
               <Section title="Departments" items={departments} onAdd={addDepartment} onUpdate={updateDepartment} onDelete={deleteDepartment} />
               <Section title="Skills" items={skills} onAdd={addSkill} onUpdate={updateSkill} onDelete={deleteSkill} />
+              <Section title="Goal Categories" items={goalCategories} onAdd={addGoalCategory} onUpdate={updateGoalCategory} onDelete={deleteGoalCategory} />
               <ProjectsSection
                 items={projects}
                 members={members}

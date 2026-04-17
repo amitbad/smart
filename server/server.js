@@ -12,6 +12,8 @@ import emailRoutes from './routes/emails.js';
 import benchRoutes from './routes/bench.js';
 import importantLinksRoutes from './routes/importantLinks.js';
 import authRoutes from './routes/auth.js';
+import goalCategoriesRoutes from './routes/goalCategories.js';
+import goalsRoutes from './routes/goals.js';
 
 dotenv.config();
 
@@ -31,6 +33,8 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/bench', benchRoutes);
 app.use('/api/important-links', importantLinksRoutes);
+app.use('/api/goal-categories', goalCategoriesRoutes);
+app.use('/api/goals', goalsRoutes);
 
 app.get('/api/health', (req, res) => {
   const dbType = getDBType();

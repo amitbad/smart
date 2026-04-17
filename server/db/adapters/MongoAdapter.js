@@ -1,4 +1,4 @@
-import { User, Designation, Department, Project, Member, ActionItem, Email, Bench, ImportantLink, Skill } from '../schemas.js';
+import { User, Designation, Department, Project, Member, ActionItem, Email, Bench, ImportantLink, Skill, GoalCategory, Goal } from '../schemas.js';
 
 class MongoAdapter {
   constructor() {
@@ -12,7 +12,9 @@ class MongoAdapter {
       emails: Email,
       bench: Bench,
       importantLinks: ImportantLink,
-      skills: Skill
+      skills: Skill,
+      goalCategories: GoalCategory,
+      goals: Goal
     };
   }
 

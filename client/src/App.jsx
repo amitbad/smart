@@ -15,6 +15,7 @@ import Masters from './pages/Masters';
 import Emails from './pages/Emails';
 import Bench from './pages/Bench';
 import ImportantLinks from './pages/ImportantLinks';
+import Goals from './pages/Goals';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -72,6 +73,7 @@ function App() {
             <Route path="/emails" element={<Emails />} />
             <Route path="/bench" element={<Bench />} />
             <Route path="/important-links" element={<ImportantLinks />} />
+            <Route path="/goals" element={<Goals />} />
             <Route path="/masters" element={<Masters />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/change-password" element={<ChangePassword />} />
