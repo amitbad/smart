@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Save, X, Plus } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContainer';
-import Dialog from '../components/Dialog';
+import Dialog, { ConfirmDialog } from '../components/Dialog';
 
 export default function AddMember() {
   const navigate = useNavigate();
@@ -28,6 +28,9 @@ export default function AddMember() {
   const [loading, setLoading] = useState(false);
   const [showSkillDialog, setShowSkillDialog] = useState(false);
   const [newSkillName, setNewSkillName] = useState('');
+  const [skillDropdownOpen, setSkillDropdownOpen] = useState(false);
+  const [confirmRemoveSkill, setConfirmRemoveSkill] = useState(false);
+  const [skillToRemove, setSkillToRemove] = useState(null);
 
   useEffect(() => {
     fetchSkills();
@@ -67,12 +70,24 @@ export default function AddMember() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSkillToggle = (skillId) => {
-    setSelectedSkills(prev =>
-      prev.includes(skillId)
-        ? prev.filter(id => id !== skillId)
-        : [...prev, skillId]
-    );
+  const handleSkillAdd = (skillId) => {
+    if (!selectedSkills.includes(skillId)) {
+      setSelectedSkills(prev => [...prev, skillId]);
+    }
+    setSkillDropdownOpen(false);
+  };
+
+  const requestRemoveSkill = (skillId) => {
+    setSkillToRemove(skillId);
+    setConfirmRemoveSkill(true);
+  };
+
+  const confirmSkillRemoval = () => {
+    if (skillToRemove) {
+      setSelectedSkills(prev => prev.filter(id => id !== skillToRemove));
+      setSkillToRemove(null);
+    }
+    setConfirmRemoveSkill(false);
   };
 
   const handleAddNewSkill = async () => {
@@ -312,34 +327,67 @@ export default function AddMember() {
               <div className="col-span-2">
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium">Primary Skills</label>
+                </div>
+
+                {/* Selected Skills Chips */}
+                {selectedSkills.length > 0 && (
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    {selectedSkills.map(skillId => {
+                      const skill = availableSkills.find(s => s.id === skillId);
+                      return skill ? (
+                        <div
+                          key={skillId}
+                          className="flex items-center gap-1 px-3 py-1 bg-cyan-600/20 text-cyan-400 rounded-full text-sm"
+                        >
+                          <span>{skill.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => requestRemoveSkill(skillId)}
+                            className="hover:text-cyan-300 ml-1"
+                            title="Remove skill"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+
+                {/* Multi-select Dropdown */}
+                <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setShowSkillDialog(true)}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                    onClick={() => setSkillDropdownOpen(!skillDropdownOpen)}
+                    className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-left flex items-center justify-between hover:border-cyan-600 focus:outline-none focus:border-cyan-600"
                   >
-                    <Plus size={12} />
-                    Add New Skill
+                    <span className="text-gray-400">Select skills...</span>
+                    <Plus size={16} className="text-gray-500" />
                   </button>
-                </div>
-                <div className="bg-gray-900 border border-gray-800 rounded p-3 max-h-48 overflow-y-auto">
-                  {availableSkills.length === 0 ? (
-                    <p className="text-sm text-gray-500">No skills available</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {availableSkills.map(skill => (
-                        <label
-                          key={skill.id}
-                          className="flex items-center gap-2 cursor-pointer hover:bg-gray-800 p-2 rounded"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedSkills.includes(skill.id)}
-                            onChange={() => handleSkillToggle(skill.id)}
-                            className="rounded border-gray-700 text-cyan-600 focus:ring-cyan-600"
-                          />
-                          <span className="text-sm">{skill.name}</span>
-                        </label>
-                      ))}
+
+                  {skillDropdownOpen && (
+                    <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded border border-gray-800 bg-black shadow-lg">
+                      <div className="py-1">
+                        {availableSkills.length === 0 ? (
+                          <div className="px-3 py-2 text-sm text-gray-500">No skills available. Add skills in Masters page.</div>
+                        ) : (
+                          availableSkills
+                            .filter(skill => !selectedSkills.includes(skill.id))
+                            .map(skill => (
+                              <button
+                                type="button"
+                                key={skill.id}
+                                onClick={() => handleSkillAdd(skill.id)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900"
+                              >
+                                {skill.name}
+                              </button>
+                            ))
+                        )}
+                        {availableSkills.filter(skill => !selectedSkills.includes(skill.id)).length === 0 && selectedSkills.length > 0 && (
+                          <div className="px-3 py-2 text-sm text-gray-500">All skills selected</div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -367,46 +415,18 @@ export default function AddMember() {
         </div>
       </div>
 
-      <Dialog
-        isOpen={showSkillDialog}
+      <ConfirmDialog
+        isOpen={confirmRemoveSkill}
         onClose={() => {
-          setShowSkillDialog(false);
-          setNewSkillName('');
+          setConfirmRemoveSkill(false);
+          setSkillToRemove(null);
         }}
-        title="Add New Skill"
-        size="sm"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Skill Name</label>
-            <input
-              type="text"
-              value={newSkillName}
-              onChange={(e) => setNewSkillName(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
-              placeholder="e.g., React, Python, Leadership"
-              onKeyPress={(e) => e.key === 'Enter' && handleAddNewSkill()}
-            />
-          </div>
-          <div className="flex justify-end gap-3">
-            <button
-              onClick={() => {
-                setShowSkillDialog(false);
-                setNewSkillName('');
-              }}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm transition"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleAddNewSkill}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm transition"
-            >
-              Add Skill
-            </button>
-          </div>
-        </div>
-      </Dialog>
+        onConfirm={confirmSkillRemoval}
+        title="Remove Skill?"
+        message={`Are you sure you want to unassign this skill from the member? This will only remove the skill assignment, not delete the skill itself.`}
+        confirmText="Remove"
+        type="danger"
+      />
     </>
   );
 }

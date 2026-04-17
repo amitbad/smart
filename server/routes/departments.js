@@ -37,6 +37,26 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Check if department is assigned to members
+router.get('/:id/assignments', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const db = getDB();
+
+    // Check if department is assigned to any members
+    const assignments = await db.findAll('members', { department_id: id });
+    const isAssigned = assignments && assignments.length > 0;
+
+    res.json({
+      isAssigned,
+      count: isAssigned ? assignments.length : 0
+    });
+  } catch (error) {
+    console.error('Error checking department assignments:', error);
+    res.status(500).json({ error: 'Failed to check department assignments' });
+  }
+});
+
 // Update department
 router.put('/:id', async (req, res) => {
   try {
@@ -63,9 +83,27 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const db = getDB();
+
+    // Check if department is assigned to any members
+    const assignments = await db.findAll('members', { department_id: id });
+    const isAssigned = assignments && assignments.length > 0;
+
+    // Unassign department from all members if assigned
+    if (isAssigned) {
+      for (const member of assignments) {
+        await db.update('members', member.id, { department_id: null });
+      }
+    }
+
+    // Delete the department
     const deleted = await db.delete('departments', id);
     if (!deleted) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: 'Deleted' });
+
+    res.json({
+      message: 'Deleted',
+      wasAssigned: isAssigned,
+      unassignedCount: isAssigned ? assignments.length : 0
+    });
   } catch (error) {
     console.error('Error deleting department:', error);
     res.status(500).json({ error: 'Failed to delete department' });

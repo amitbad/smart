@@ -47,6 +47,7 @@ export default function Masters() {
   const [designations, setDesignations] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [skills, setSkills] = useState([]);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -57,15 +58,17 @@ export default function Masters() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [dsg, dep, pro, mem] = await Promise.all([
+      const [dsg, dep, pro, skl, mem] = await Promise.all([
         axios.get('/api/designations'),
         axios.get('/api/departments'),
         axios.get('/api/projects'),
+        axios.get('/api/skills'),
         axios.get('/api/members?limit=1000')
       ]);
       setDesignations(dsg.data || []);
       setDepartments(dep.data || []);
       setProjects(pro.data || []);
+      setSkills(skl.data || []);
       setMembers(mem.data?.data || []);
     } catch (e) {
       toast.error('Failed to load masters');
@@ -85,8 +88,26 @@ export default function Masters() {
   const addDepartment = async (name) => { try { await axios.post('/api/departments', { name }); loadAll(); toast.success('Department added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
   const updateDepartment = async (id, name) => { try { await axios.put(`/api/departments/${id}`, { name }); loadAll(); toast.success('Department updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
   const deleteDepartment = async (id) => {
-    setPendingDelete({ type: 'department', id, title: 'Delete Department?', message: 'Are you sure you want to delete this department? This action cannot be undone.' });
-    setConfirmOpen(true);
+    try {
+      // Check if department is assigned to members
+      const response = await axios.get(`/api/departments/${id}/assignments`);
+      const { isAssigned, count } = response.data;
+
+      let message = 'Are you sure you want to delete this department?';
+      if (isAssigned) {
+        message = `This department is assigned to ${count} member${count > 1 ? 's' : ''}. Deleting this will unassign this department from all members. Do you want to continue?`;
+      }
+
+      setPendingDelete({
+        type: 'department',
+        id,
+        title: 'Delete Department?',
+        message
+      });
+      setConfirmOpen(true);
+    } catch (e) {
+      toast.error('Failed to check department assignments');
+    }
   };
 
   // Projects handlers
@@ -95,6 +116,32 @@ export default function Masters() {
   const deleteProject = async (id) => {
     setPendingDelete({ type: 'project', id, title: 'Delete Project?', message: 'Are you sure you want to delete this project? This action cannot be undone.' });
     setConfirmOpen(true);
+  };
+
+  // Skills handlers
+  const addSkill = async (name) => { try { await axios.post('/api/skills', { name }); loadAll(); toast.success('Skill added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const updateSkill = async (id, name) => { try { await axios.put(`/api/skills/${id}`, { name }); loadAll(); toast.success('Skill updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const deleteSkill = async (id) => {
+    try {
+      // Check if skill is assigned to members
+      const response = await axios.get(`/api/skills/${id}/assignments`);
+      const { isAssigned, count } = response.data;
+
+      let message = 'Are you sure you want to delete this skill?';
+      if (isAssigned) {
+        message = `This skill is assigned to ${count} member${count > 1 ? 's' : ''}. Deleting this will unassign this skill from all members. Do you want to continue?`;
+      }
+
+      setPendingDelete({
+        type: 'skill',
+        id,
+        title: 'Delete Skill?',
+        message
+      });
+      setConfirmOpen(true);
+    } catch (e) {
+      toast.error('Failed to check skill assignments');
+    }
   };
 
   const confirmDelete = async () => {
@@ -109,6 +156,9 @@ export default function Masters() {
       } else if (type === 'project') {
         await axios.delete(`/api/projects/${id}`);
         toast.success('Project deleted');
+      } else if (type === 'skill') {
+        await axios.delete(`/api/skills/${id}`);
+        toast.success('Skill deleted');
       }
       await loadAll();
     } catch (e) {
@@ -131,6 +181,7 @@ export default function Masters() {
             <>
               <Section title="Designations" items={designations} onAdd={addDesignation} onUpdate={updateDesignation} onDelete={deleteDesignation} />
               <Section title="Departments" items={departments} onAdd={addDepartment} onUpdate={updateDepartment} onDelete={deleteDepartment} />
+              <Section title="Skills" items={skills} onAdd={addSkill} onUpdate={updateSkill} onDelete={deleteSkill} />
               <ProjectsSection
                 items={projects}
                 members={members}
