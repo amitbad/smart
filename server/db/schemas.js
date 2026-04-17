@@ -30,7 +30,7 @@ const memberSchema = new mongoose.Schema({
   designation: String,
   designation_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Designation' },
   department_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
-  level: { type: String, default: '1' },
+  level: { type: String, default: null },
   manager_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }

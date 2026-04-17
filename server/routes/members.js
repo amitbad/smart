@@ -300,7 +300,7 @@ router.post('/', async (req, res) => {
         name,
         email: encryptedEmail,
         designation,
-        level: level || 1,
+        level: level ?? null,
         manager_id: manager_id || null,
         designation_id: designation_id || null,
         department_id: department_id || null
@@ -385,7 +385,7 @@ router.put('/:id', async (req, res) => {
       if (name) updateData.name = name;
       if (email) updateData.email = encrypt(email); // Encrypt email before storing
       if (designation) updateData.designation = designation;
-      if (level !== undefined) updateData.level = level;
+      if (level !== undefined) updateData.level = level || null;
       if (manager_id !== undefined) updateData.manager_id = manager_id || null;
       if (designation_id !== undefined) updateData.designation_id = designation_id || null;
       if (department_id !== undefined) updateData.department_id = department_id || null;

@@ -201,7 +201,7 @@ export default function Members() {
                         </td>
                         <td className="px-5 py-3">
                           <span className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs">
-                            L{member.level || 0}
+                            {member.level || '-'}
                           </span>
                         </td>
                         <td className="px-5 py-3">
