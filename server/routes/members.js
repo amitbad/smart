@@ -32,14 +32,42 @@ router.get('/', async (req, res) => {
         populate: ['manager_id', 'designation_id', 'department_id']
       });
 
-      // Decrypt emails before sending to client (handles both encrypted and plain text)
+      // Decrypt emails and shape fields (manager_name) and batch-load skills for all listed members
       const decryptedMembers = members.map(m => ({
         ...m,
-        email: m.email ? safeDecrypt(m.email) : m.email
+        email: m.email ? safeDecrypt(m.email) : m.email,
+        manager_name: m.manager_id && typeof m.manager_id === 'object' ? m.manager_id.name : undefined
       }));
 
+      // Batch fetch skills for these members
+      const memberIds = decryptedMembers.map(m => m.id);
+      let membersWithSkills = decryptedMembers;
+      if (memberIds.length > 0) {
+        const memberSkills = await db.findAll('memberSkills', { member_id: { $in: memberIds } });
+        const skillIdSet = new Set(memberSkills.map(ms => ms.skill_id?.toString()));
+        const skillIds = Array.from(skillIdSet).filter(Boolean);
+        const skills = skillIds.length > 0
+          ? await db.findAll('skills', { _id: { $in: skillIds } })
+          : [];
+        const skillMap = new Map(skills.map(s => [s.id, s]));
+        const byMember = new Map();
+        for (const ms of memberSkills) {
+          const mid = ms.member_id?.toString();
+          const sid = ms.skill_id?.toString();
+          if (!mid || !sid) continue;
+          const list = byMember.get(mid) || [];
+          const skill = skillMap.get(sid);
+          if (skill) list.push({ id: skill.id, name: skill.name });
+          byMember.set(mid, list);
+        }
+        membersWithSkills = decryptedMembers.map(m => ({
+          ...m,
+          skills: byMember.get(m.id) || []
+        }));
+      }
+
       return res.json({
-        data: decryptedMembers,
+        data: membersWithSkills,
         pagination: {
           page: parseInt(page),
           limit: parseInt(limit),

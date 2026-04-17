@@ -208,7 +208,13 @@ export default function Members() {
                           {member.skills && member.skills.length > 0 ? (
                             <div className="relative group inline-block">
                               <span className="px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded text-xs font-medium cursor-help">
-                                {member.skills.length} {member.skills.length === 1 ? 'skill' : 'skills'}
+                                {member.skills[0].name}
+                                {member.skills.length > 1 && (
+                                  <>
+                                    <span className="mx-1">+</span>
+                                    {member.skills.length - 1}
+                                  </>
+                                )}
                               </span>
                               {/* Tooltip */}
                               <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-50 w-max max-w-xs">
