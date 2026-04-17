@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye, MessageSquarePlus, MessageSquare } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye, MessageSquarePlus, MessageSquare, MoreVertical } from 'lucide-react';
 import axios from 'axios';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
 import { useToast } from '../components/ToastContainer';
@@ -38,6 +38,9 @@ export default function ActionItems() {
   const [editingCommentText, setEditingCommentText] = useState('');
   const [commentDeleteConfirmOpen, setCommentDeleteConfirmOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState(null);
+  const [editingPriorityId, setEditingPriorityId] = useState(null);
+  const [editingStatusId, setEditingStatusId] = useState(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -56,6 +59,9 @@ export default function ActionItems() {
       if (notifOpen && notifRef.current && !notifRef.current.contains(e.target)) {
         setNotifOpen(false);
       }
+      setOpenActionMenuId(null);
+      setEditingPriorityId(null);
+      setEditingStatusId(null);
     };
     window.addEventListener('click', onClick);
     return () => window.removeEventListener('click', onClick);
@@ -274,7 +280,14 @@ export default function ActionItems() {
   };
 
   const updateQuick = async (it, field, value) => {
-    try { await axios.put(`/api/action-items/${it.id}`, { [field]: value }); fetchItems(); } catch { toast.error('Update failed'); }
+    try {
+      await axios.put(`/api/action-items/${it.id}`, { [field]: value });
+      fetchItems();
+      if (field === 'priority') setEditingPriorityId(null);
+      if (field === 'status') setEditingStatusId(null);
+    } catch {
+      toast.error('Update failed');
+    }
   };
 
   const handleDuplicate = async (it) => {
@@ -433,7 +446,35 @@ export default function ActionItems() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-2"><Pill text={it.priority} kind="priority" /></td>
+                            <td className="px-4 py-2">
+                              {editingPriorityId === it.id ? (
+                                <select
+                                  autoFocus
+                                  className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                  value={it.priority}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => updateQuick(it, 'priority', e.target.value)}
+                                  onBlur={() => setEditingPriorityId(null)}
+                                >
+                                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Pill text={it.priority} kind="priority" />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingStatusId(null);
+                                      setEditingPriorityId(it.id);
+                                    }}
+                                    className="text-gray-500 hover:text-white"
+                                    title="Edit priority"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
                             <td className="px-4 py-2 text-gray-300">
                               {it.dependency_member_ids?.length ? (() => {
                                 const id = it.dependency_member_ids[0];
@@ -443,34 +484,80 @@ export default function ActionItems() {
                                 <span className="text-gray-500 text-xs">None</span>
                               )}
                             </td>
-                            <td className="px-4 py-2"><Pill text={it.status} /></td>
                             <td className="px-4 py-2">
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => openEdit(it)} className="text-gray-400 hover:text-white" title="Edit"><Edit2 size={16} /></button>
-                                <button
-                                  onClick={() => openComments(it)}
-                                  className={`${it.comments?.length ? 'text-cyan-400 hover:text-cyan-300' : 'text-gray-400 hover:text-white'}`}
-                                  title={it.comments?.length ? `Comments (${it.comments.length})` : 'Add comment'}
+                              {editingStatusId === it.id ? (
+                                <select
+                                  autoFocus
+                                  className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                  value={it.status}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => updateQuick(it, 'status', e.target.value)}
+                                  onBlur={() => setEditingStatusId(null)}
                                 >
-                                  {it.comments?.length ? <MessageSquare size={16} /> : <MessageSquarePlus size={16} />}
-                                </button>
-                                <div className="relative inline-block">
-                                  <button className="text-gray-400 hover:text-white flex items-center gap-1" title="Update Priority">
-                                    <Filter size={16} /><ChevronDown size={14} />
-                                  </button>
-                                  <div className="absolute hidden group-hover:block"></div>
-                                  <div className="absolute mt-1 bg-black border border-gray-800 rounded shadow-lg z-10 hidden"></div>
-                                </div>
-                                <select className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
-                                  value={it.priority} onChange={(e) => updateQuick(it, 'priority', e.target.value)}>
-                                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                                <select className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
-                                  value={it.status} onChange={(e) => updateQuick(it, 'status', e.target.value)}>
                                   {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>
-                                <button onClick={() => handleDuplicate(it)} className="text-gray-400 hover:text-white" title="Duplicate"><Copy size={16} /></button>
-                                <button onClick={() => requestDelete(it)} className={`text-gray-400 hover:text-red-400 ${it.status === 'Completed' ? 'opacity-40 cursor-not-allowed' : ''}`} disabled={it.status === 'Completed'} title="Delete"><Trash2 size={16} /></button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <Pill text={it.status} />
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingPriorityId(null);
+                                      setEditingStatusId(it.id);
+                                    }}
+                                    className="text-gray-500 hover:text-white"
+                                    title="Edit status"
+                                  >
+                                    <Edit2 size={14} />
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenActionMenuId(prev => prev === it.id ? null : it.id);
+                                    }}
+                                    className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800"
+                                    title="More actions"
+                                  >
+                                    <MoreVertical size={16} />
+                                  </button>
+                                  {openActionMenuId === it.id && (
+                                    <div
+                                      className="absolute right-0 mt-1 w-44 bg-black border border-gray-800 rounded shadow-lg z-20 py-1"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <button onClick={() => { setOpenActionMenuId(null); openViewDetails(it); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2">
+                                        <Eye size={14} />
+                                        <span>View Item</span>
+                                      </button>
+                                      <button onClick={() => { setOpenActionMenuId(null); openEdit(it); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2">
+                                        <Edit2 size={14} />
+                                        <span>Edit Item</span>
+                                      </button>
+                                      <button onClick={() => { setOpenActionMenuId(null); openComments(it); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2">
+                                        {it.comments?.length ? <MessageSquare size={14} /> : <MessageSquarePlus size={14} />}
+                                        <span>Add Note</span>
+                                      </button>
+                                      <button onClick={() => { setOpenActionMenuId(null); handleDuplicate(it); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2">
+                                        <Copy size={14} />
+                                        <span>Duplicate Item</span>
+                                      </button>
+                                      <button
+                                        onClick={() => { setOpenActionMenuId(null); requestDelete(it); }}
+                                        disabled={it.status === 'Completed'}
+                                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2 ${it.status === 'Completed' ? 'opacity-40 cursor-not-allowed' : 'text-red-400 hover:text-red-300'}`}
+                                      >
+                                        <Trash2 size={14} />
+                                        <span>Delete</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </td>
                           </tr>
