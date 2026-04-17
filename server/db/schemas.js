@@ -12,6 +12,11 @@ const designationSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now }
 });
 
+const locationSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  created_at: { type: Date, default: Date.now }
+});
+
 const departmentSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
   created_at: { type: Date, default: Date.now }
@@ -29,6 +34,7 @@ const memberSchema = new mongoose.Schema({
   phone: String,
   designation: String,
   designation_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Designation' },
+  location_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Location' },
   department_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
   level: { type: String, default: null },
   manager_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
@@ -108,6 +114,7 @@ const goalSchema = new mongoose.Schema({
 
 export const User = mongoose.model('User', userSchema);
 export const Designation = mongoose.model('Designation', designationSchema);
+export const Location = mongoose.model('Location', locationSchema);
 export const Department = mongoose.model('Department', departmentSchema);
 export const Project = mongoose.model('Project', projectSchema);
 export const Member = mongoose.model('Member', memberSchema);

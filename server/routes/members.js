@@ -29,14 +29,15 @@ router.get('/', async (req, res) => {
         sort: { created_at: -1 },
         limit: parseInt(limit),
         skip: offset,
-        populate: ['manager_id', 'designation_id', 'department_id']
+        populate: ['manager_id', 'designation_id', 'location_id', 'department_id']
       });
 
       // Decrypt emails and shape fields (manager_name) and batch-load skills for all listed members
       const decryptedMembers = members.map(m => ({
         ...m,
         email: m.email ? safeDecrypt(m.email) : m.email,
-        manager_name: m.manager_id && typeof m.manager_id === 'object' ? m.manager_id.name : undefined
+        manager_name: m.manager_id && typeof m.manager_id === 'object' ? m.manager_id.name : undefined,
+        location: m.location_id && typeof m.location_id === 'object' ? m.location_id.name : null
       }));
 
       // Batch fetch skills for these members
@@ -102,6 +103,7 @@ router.get('/', async (req, res) => {
       SELECT 
         m.*,
         mgr.name as manager_name,
+        loc.name as location,
         COALESCE(
           json_agg(
             json_build_object('id', s.id, 'name', s.name)
@@ -110,10 +112,11 @@ router.get('/', async (req, res) => {
         ) as skills
       FROM members m
       LEFT JOIN members mgr ON m.manager_id = mgr.id
+      LEFT JOIN locations loc ON m.location_id = loc.id
       LEFT JOIN member_skills ms ON m.id = ms.member_id
       LEFT JOIN skills s ON ms.skill_id = s.id
       ${whereClause}
-      GROUP BY m.id, mgr.name
+      GROUP BY m.id, mgr.name, loc.name
       ORDER BY m.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -199,6 +202,10 @@ router.get('/:id', async (req, res) => {
         const designation = await db.findById('designations', member.designation_id);
         member.designation = designation?.name;
       }
+      if (member.location_id) {
+        const location = await db.findById('locations', member.location_id);
+        member.location = location?.name;
+      }
       if (member.department_id) {
         const department = await db.findById('departments', member.department_id);
         member.department = department?.name;
@@ -227,6 +234,7 @@ router.get('/:id', async (req, res) => {
       SELECT 
         m.*,
         mgr.name as manager_name,
+        loc.name as location,
         COALESCE(
           json_agg(
             json_build_object('id', s.id, 'name', s.name)
@@ -235,10 +243,11 @@ router.get('/:id', async (req, res) => {
         ) as skills
       FROM members m
       LEFT JOIN members mgr ON m.manager_id = mgr.id
+      LEFT JOIN locations loc ON m.location_id = loc.id
       LEFT JOIN member_skills ms ON m.id = ms.member_id
       LEFT JOIN skills s ON ms.skill_id = s.id
       WHERE m.id = $1
-      GROUP BY m.id, mgr.name
+      GROUP BY m.id, mgr.name, loc.name
     `, [id]);
 
     if (result.rows.length === 0) {
@@ -282,7 +291,7 @@ router.get('/:id/reportees', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, email, designation, level, manager_id, skills, designation_id, department_id } = req.body;
+    const { name, email, designation, level, manager_id, skills, designation_id, location_id, department_id } = req.body;
 
     if (!name || !email) {
       return res.status(400).json({ error: 'Name and email are required' });
@@ -303,6 +312,7 @@ router.post('/', async (req, res) => {
         level: level ?? null,
         manager_id: manager_id || null,
         designation_id: designation_id || null,
+        location_id: location_id || null,
         department_id: department_id || null
       });
 
@@ -323,6 +333,10 @@ router.post('/', async (req, res) => {
         if (skill) memberSkills.push(skill);
       }
       newMember.skills = memberSkills;
+      if (newMember.location_id) {
+        const location = await db.findById('locations', newMember.location_id);
+        newMember.location = location?.name || null;
+      }
 
       // Decrypt email before sending response
       newMember.email = safeDecrypt(newMember.email);
@@ -344,10 +358,10 @@ router.post('/', async (req, res) => {
     }
 
     const result = await client.query(`
-      INSERT INTO members (name, email, designation, level, manager_id)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO members (name, email, designation, level, manager_id, location_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
-    `, [name, email, designation, level, manager_id]);
+    `, [name, email, designation, level, manager_id, location_id || null]);
 
     const member = result.rows[0];
 
@@ -367,6 +381,7 @@ router.post('/', async (req, res) => {
     const memberWithSkills = await pool.query(`
       SELECT 
         m.*,
+        loc.name as location,
         COALESCE(
           json_agg(
             json_build_object('id', s.id, 'name', s.name)
@@ -374,10 +389,11 @@ router.post('/', async (req, res) => {
           '[]'
         ) as skills
       FROM members m
+      LEFT JOIN locations loc ON m.location_id = loc.id
       LEFT JOIN member_skills ms ON m.id = ms.member_id
       LEFT JOIN skills s ON ms.skill_id = s.id
       WHERE m.id = $1
-      GROUP BY m.id
+      GROUP BY m.id, loc.name
     `, [member.id]);
 
     res.status(201).json(memberWithSkills.rows[0]);
@@ -393,7 +409,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, designation, level, manager_id, skills, designation_id, department_id } = req.body;
+    const { name, email, designation, level, manager_id, skills, designation_id, location_id, department_id } = req.body;
     const db = getDB();
     const dbType = getDBType();
 
@@ -406,6 +422,7 @@ router.put('/:id', async (req, res) => {
       if (level !== undefined) updateData.level = level || null;
       if (manager_id !== undefined) updateData.manager_id = manager_id || null;
       if (designation_id !== undefined) updateData.designation_id = designation_id || null;
+      if (location_id !== undefined) updateData.location_id = location_id || null;
       if (department_id !== undefined) updateData.department_id = department_id || null;
 
       const updated = await db.update('members', id, updateData);
@@ -439,6 +456,10 @@ router.put('/:id', async (req, res) => {
         if (skill) memberSkills.push(skill);
       }
       memberWithSkills.skills = memberSkills;
+      if (memberWithSkills.location_id) {
+        const location = await db.findById('locations', memberWithSkills.location_id);
+        memberWithSkills.location = location?.name || null;
+      }
 
       // Decrypt email before sending response
       if (memberWithSkills.email) {
@@ -467,10 +488,11 @@ router.put('/:id', async (req, res) => {
           designation = COALESCE($3, designation),
           level = COALESCE($4, level),
           manager_id = COALESCE($5, manager_id),
+          location_id = COALESCE($6, location_id),
           updated_at = CURRENT_TIMESTAMP
-      WHERE id = $6
+      WHERE id = $7
       RETURNING *
-    `, [name, email, designation, level, manager_id, id]);
+    `, [name, email, designation, level, manager_id, location_id || null, id]);
 
     if (result.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -497,6 +519,7 @@ router.put('/:id', async (req, res) => {
     const memberWithSkills = await pool.query(`
       SELECT 
         m.*,
+        loc.name as location,
         COALESCE(
           json_agg(
             json_build_object('id', s.id, 'name', s.name)
@@ -504,10 +527,11 @@ router.put('/:id', async (req, res) => {
           '[]'
         ) as skills
       FROM members m
+      LEFT JOIN locations loc ON m.location_id = loc.id
       LEFT JOIN member_skills ms ON m.id = ms.member_id
       LEFT JOIN skills s ON ms.skill_id = s.id
       WHERE m.id = $1
-      GROUP BY m.id
+      GROUP BY m.id, loc.name
     `, [id]);
 
     res.json(memberWithSkills.rows[0]);

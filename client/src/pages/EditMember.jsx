@@ -15,12 +15,14 @@ export default function EditMember() {
     email: '',
     designation: '',
     level: '',
-    manager_id: ''
+    manager_id: '',
+    location_id: ''
   });
 
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [availableSkills, setAvailableSkills] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [designationInput, setDesignationInput] = useState('');
   const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +38,7 @@ export default function EditMember() {
     fetchSkills();
     fetchManagers();
     fetchDesignations();
+    fetchLocations();
   }, [id]);
 
   const fetchMember = async () => {
@@ -47,7 +50,8 @@ export default function EditMember() {
         email: member.email,
         designation: member.designation || '',
         level: member.level || '',
-        manager_id: member.manager_id || ''
+        manager_id: member.manager_id || '',
+        location_id: member.location_id || ''
       });
       setSelectedSkills(member.skills?.map(s => s.id) || []);
       setLoading(false);
@@ -66,6 +70,15 @@ export default function EditMember() {
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      const res = await axios.get('/api/locations');
+      setLocations(res.data || []);
+    } catch (e) {
+      toast.error('Failed to load locations');
+    }
+  };
+
   const fetchSkills = async () => {
     try {
       const response = await axios.get('/api/skills');
@@ -77,8 +90,8 @@ export default function EditMember() {
 
   const fetchManagers = async () => {
     try {
-      const response = await axios.get('/api/members');
-      setManagers(response.data.data?.filter(m => m.id !== parseInt(id)) || []);
+      const response = await axios.get('/api/members?limit=1000');
+      setManagers(response.data.data?.filter(m => String(m.id) !== String(id)) || []);
     } catch (error) {
       toast.error('Failed to load managers');
     }
@@ -141,6 +154,7 @@ export default function EditMember() {
         ...formData,
         level: formData.level || null,
         manager_id: formData.manager_id || null,
+        location_id: formData.location_id || null,
         skills: selectedSkills
       });
 
@@ -278,6 +292,21 @@ export default function EditMember() {
                   className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
                   placeholder="e.g., A1, A2, 3, 10"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Location</label>
+                <select
+                  name="location_id"
+                  value={formData.location_id}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                >
+                  <option value="">Select city</option>
+                  {locations.map(location => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="col-span-2">

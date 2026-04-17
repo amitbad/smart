@@ -8,9 +8,13 @@ function Section({ title, items, onAdd, onUpdate, onDelete, renderExtra }) {
   const [name, setName] = useState('');
   const [editing, setEditing] = useState(null);
   const [editName, setEditName] = useState('');
+  const itemColumns = [];
+  for (let i = 0; i < items.length; i += 4) {
+    itemColumns.push(items.slice(i, i + 4));
+  }
 
   return (
-    <div className="bg-black border border-gray-800 rounded p-4">
+    <div className="bg-black border border-gray-800 rounded p-4 h-[220px] flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-cyan-400">{title}</h3>
         <div className="flex items-center gap-2">
@@ -18,26 +22,30 @@ function Section({ title, items, onAdd, onUpdate, onDelete, renderExtra }) {
           <button onClick={() => { if (name.trim()) { onAdd(name.trim()); setName(''); } }} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs flex items-center gap-1"><Plus size={14} />Add</button>
         </div>
       </div>
-      <ul className="divide-y divide-gray-800">
-        {items.map(it => (
-          <li key={it.id} className="flex items-center justify-between py-2">
-            {editing === it.id ? (
-              <div className="flex items-center gap-2">
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm" />
-                <button onClick={() => { onUpdate(it.id, editName.trim()); setEditing(null); }} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 rounded text-xs">Save</button>
-                <button onClick={() => { setEditing(null); }} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs">Cancel</button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <span className="text-sm">{it.name}</span>
-                <button onClick={() => { setEditing(it.id); setEditName(it.name); }} className="text-gray-400 hover:text-white" title="Edit"><Pencil size={16} /></button>
-                <button onClick={() => onDelete(it.id)} className="text-gray-400 hover:text-red-400" title="Delete"><Trash2 size={16} /></button>
-              </div>
-            )}
-            {renderExtra ? renderExtra(it) : null}
-          </li>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 overflow-y-auto pr-1 flex-1 scrollbar-none">
+        {itemColumns.map((columnItems, columnIndex) => (
+          <ul key={columnIndex} className="min-w-0">
+            {columnItems.map(it => (
+              <li key={it.id} className="flex items-center justify-between py-2 border-b border-gray-800 min-w-0">
+                {editing === it.id ? (
+                  <div className="flex items-center gap-2 min-w-0">
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm" />
+                    <button onClick={() => { onUpdate(it.id, editName.trim()); setEditing(null); }} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 rounded text-xs">Save</button>
+                    <button onClick={() => { setEditing(null); }} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs">Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-sm truncate">{it.name}</span>
+                    <button onClick={() => { setEditing(it.id); setEditName(it.name); }} className="text-gray-400 hover:text-white" title="Edit"><Pencil size={16} /></button>
+                    <button onClick={() => onDelete(it.id)} className="text-gray-400 hover:text-red-400" title="Delete"><Trash2 size={16} /></button>
+                  </div>
+                )}
+                {renderExtra ? renderExtra(it) : null}
+              </li>
+            ))}
+          </ul>
         ))}
-      </ul>
+      </div>
     </div>
   );
 }
@@ -45,6 +53,7 @@ function Section({ title, items, onAdd, onUpdate, onDelete, renderExtra }) {
 export default function Masters() {
   const toast = useToast();
   const [designations, setDesignations] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [projects, setProjects] = useState([]);
   const [skills, setSkills] = useState([]);
@@ -59,8 +68,9 @@ export default function Masters() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [dsg, dep, pro, skl, gcat, mem] = await Promise.all([
+      const [dsg, loc, dep, pro, skl, gcat, mem] = await Promise.all([
         axios.get('/api/designations'),
+        axios.get('/api/locations'),
         axios.get('/api/departments'),
         axios.get('/api/projects'),
         axios.get('/api/skills'),
@@ -68,6 +78,7 @@ export default function Masters() {
         axios.get('/api/members?limit=1000')
       ]);
       setDesignations(dsg.data || []);
+      setLocations(loc.data || []);
       setDepartments(dep.data || []);
       setProjects(pro.data || []);
       setSkills(skl.data || []);
@@ -85,6 +96,13 @@ export default function Masters() {
   const updateDesignation = async (id, name) => { try { await axios.put(`/api/designations/${id}`, { name }); loadAll(); toast.success('Designation updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
   const deleteDesignation = async (id) => {
     setPendingDelete({ type: 'designation', id, title: 'Delete Designation?', message: 'Are you sure you want to delete this designation? This action cannot be undone.' });
+    setConfirmOpen(true);
+  };
+
+  const addLocation = async (name) => { try { await axios.post('/api/locations', { name }); loadAll(); toast.success('Location added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const updateLocation = async (id, name) => { try { await axios.put(`/api/locations/${id}`, { name }); loadAll(); toast.success('Location updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
+  const deleteLocation = async (id) => {
+    setPendingDelete({ type: 'location', id, title: 'Delete Location?', message: 'Are you sure you want to delete this location? Members using this city will be unassigned.' });
     setConfirmOpen(true);
   };
 
@@ -179,6 +197,9 @@ export default function Masters() {
       if (type === 'designation') {
         await axios.delete(`/api/designations/${id}`);
         toast.success('Designation deleted');
+      } else if (type === 'location') {
+        await axios.delete(`/api/locations/${id}`);
+        toast.success('Location deleted');
       } else if (type === 'department') {
         await axios.delete(`/api/departments/${id}`);
         toast.success('Department deleted');
@@ -212,6 +233,7 @@ export default function Masters() {
           ) : (
             <>
               <Section title="Designations" items={designations} onAdd={addDesignation} onUpdate={updateDesignation} onDelete={deleteDesignation} />
+              <Section title="Locations" items={locations} onAdd={addLocation} onUpdate={updateLocation} onDelete={deleteLocation} />
               <Section title="Departments" items={departments} onAdd={addDepartment} onUpdate={updateDepartment} onDelete={deleteDepartment} />
               <Section title="Skills" items={skills} onAdd={addSkill} onUpdate={updateSkill} onDelete={deleteSkill} />
               <Section title="Goal Categories" items={goalCategories} onAdd={addGoalCategory} onUpdate={updateGoalCategory} onDelete={deleteGoalCategory} />

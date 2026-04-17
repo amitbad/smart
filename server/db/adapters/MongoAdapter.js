@@ -1,10 +1,11 @@
-import { User, Designation, Department, Project, Member, ActionItem, Email, Bench, ImportantLink, Skill, MemberSkill, GoalCategory, Goal } from '../schemas.js';
+import { User, Designation, Location, Department, Project, Member, ActionItem, Email, Bench, ImportantLink, Skill, MemberSkill, GoalCategory, Goal } from '../schemas.js';
 
 class MongoAdapter {
   constructor() {
     this.models = {
       users: User,
       designations: Designation,
+      locations: Location,
       departments: Department,
       projects: Project,
       members: Member,

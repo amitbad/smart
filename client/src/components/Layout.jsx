@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target } from 'lucide-react';
+import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target, X } from 'lucide-react';
 import axios from 'axios';
 
 export default function Layout({ children, user, onLogout }) {
@@ -11,6 +11,8 @@ export default function Layout({ children, user, onLogout }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [todayActions, setTodayActions] = useState([]);
   const [todayEmails, setTodayEmails] = useState([]);
+  const [dismissedActionIds, setDismissedActionIds] = useState(new Set());
+  const [dismissedEmailIds, setDismissedEmailIds] = useState(new Set());
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -24,7 +26,19 @@ export default function Layout({ children, user, onLogout }) {
         const e = Array.isArray(em.data) ? em.data : [];
         setTodayActions(a);
         setTodayEmails(e);
-        setTodayCount(a.length + e.length);
+
+        const validActionIds = new Set(a.map(item => item.id));
+        const validEmailIds = new Set(e.map(item => item.id));
+        setDismissedActionIds(prev => {
+          const next = new Set();
+          prev.forEach(id => { if (validActionIds.has(id)) next.add(id); });
+          return next;
+        });
+        setDismissedEmailIds(prev => {
+          const next = new Set();
+          prev.forEach(id => { if (validEmailIds.has(id)) next.add(id); });
+          return next;
+        });
       } catch {
         setTodayActions([]);
         setTodayEmails([]);
@@ -33,6 +47,20 @@ export default function Layout({ children, user, onLogout }) {
     };
     fetchAll();
   }, [location.pathname]);
+
+  useEffect(() => {
+    const visibleActions = todayActions.filter(a => !dismissedActionIds.has(a.id));
+    const visibleEmails = todayEmails.filter(e => !dismissedEmailIds.has(e.id));
+    setTodayCount(visibleActions.length + visibleEmails.length);
+  }, [todayActions, todayEmails, dismissedActionIds, dismissedEmailIds]);
+
+  const dismissAction = (id) => {
+    setDismissedActionIds(prev => new Set([...prev, id]));
+  };
+
+  const dismissEmail = (id) => {
+    setDismissedEmailIds(prev => new Set([...prev, id]));
+  };
 
   const isActive = (path) => location.pathname === path;
 
@@ -199,25 +227,61 @@ export default function Layout({ children, user, onLogout }) {
             )}
           </button>
           {notifOpen && (
-            <div className="absolute right-4 top-12 w-96 bg-black border border-gray-800 rounded shadow-lg z-20">
-              <div className="px-3 py-2 border-b border-gray-800 text-sm text-gray-400">Today's Overview</div>
-              <div className="max-h-80 overflow-auto">
-                <div className="px-3 py-2 text-xs text-gray-500">Emails to reply today</div>
-                {todayEmails.length === 0 ? (
+            <div className="absolute right-4 top-12 w-96 bg-gray-950 border border-gray-700 rounded-lg shadow-2xl ring-1 ring-gray-700/70 z-20 overflow-hidden">
+              <div className="px-3 py-2 border-b border-gray-800 text-sm text-gray-300 flex items-center justify-between bg-gradient-to-b from-gray-900 to-gray-950">
+                <span>Today's Overview</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setNotifOpen(false);
+                  }}
+                  className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800 transition"
+                  title="Close notifications"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="max-h-80 overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600/50 hover:scrollbar-thumb-gray-500/70">
+                <div className="px-3 py-2 text-xs text-gray-500 font-semibold">Emails to reply today</div>
+                {todayEmails.filter(em => !dismissedEmailIds.has(em.id)).length === 0 ? (
                   <div className="px-3 pb-2 text-xs text-gray-600">None</div>
-                ) : todayEmails.map(em => (
-                  <div key={em.id} className="px-3 py-2 hover:bg-gray-900 cursor-pointer" onClick={() => { setNotifOpen(false); navigate('/emails'); }}>
-                    <div className="text-sm text-gray-200 truncate" title={em.subject}>{em.subject}</div>
-                    <div className="text-xs text-gray-500 truncate">{em.sender}</div>
+                ) : todayEmails.filter(em => !dismissedEmailIds.has(em.id)).map(em => (
+                  <div key={em.id} className="px-3 py-2 hover:bg-gray-900/80 cursor-pointer border-b border-gray-900 last:border-b-0 group flex items-start gap-3" onClick={() => { setNotifOpen(false); navigate('/emails'); }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-200 truncate" title={em.subject}>{em.subject}</div>
+                      <div className="text-xs text-gray-500 truncate">{em.sender}</div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissEmail(em.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 p-1 rounded hover:bg-gray-800 flex-shrink-0 transition-all"
+                      title="Dismiss notification"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 ))}
-                <div className="px-3 pt-3 text-xs text-gray-500">Action items for today</div>
-                {todayActions.length === 0 ? (
+                <div className="px-3 pt-3 text-xs text-gray-500 font-semibold">Action items for today</div>
+                {todayActions.filter(ai => !dismissedActionIds.has(ai.id)).length === 0 ? (
                   <div className="px-3 pb-3 text-xs text-gray-600">None</div>
-                ) : todayActions.map(ai => (
-                  <div key={ai.id} className="px-3 py-2 hover:bg-gray-900 cursor-pointer" onClick={() => { setNotifOpen(false); navigate('/action-items'); }}>
-                    <div className="text-sm text-gray-200 truncate" title={ai.description}>{ai.description}</div>
-                    <div className="text-xs text-gray-500">{ai.priority}</div>
+                ) : todayActions.filter(ai => !dismissedActionIds.has(ai.id)).map(ai => (
+                  <div key={ai.id} className="px-3 py-2 hover:bg-gray-900/80 cursor-pointer border-b border-gray-900 last:border-b-0 group flex items-start gap-3" onClick={() => { setNotifOpen(false); navigate('/action-items'); }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm text-gray-200 truncate" title={ai.description}>{ai.description}</div>
+                      <div className="text-xs text-gray-500">{ai.priority}</div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissAction(ai.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 p-1 rounded hover:bg-gray-800 flex-shrink-0 transition-all"
+                      title="Dismiss notification"
+                    >
+                      <X size={14} />
+                    </button>
                   </div>
                 ))}
               </div>

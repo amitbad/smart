@@ -167,6 +167,7 @@ export default function Members() {
                     <tr className="text-left text-xs text-gray-500">
                       <th className="px-3 py-2 font-semibold">Name</th>
                       <th className="px-3 py-2 font-semibold">Designation</th>
+                      <th className="px-3 py-2 font-semibold">Location</th>
                       <th className="px-3 py-2 font-semibold">Manager</th>
                       <th className="px-3 py-2 font-semibold">Level</th>
                       <th className="px-3 py-2 font-semibold">Skills</th>
@@ -196,6 +197,7 @@ export default function Members() {
                           </div>
                         </td>
                         <td className="px-3 py-2 text-sm">{member.designation || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-gray-400">{member.location || '-'}</td>
                         <td className="px-3 py-2 text-sm text-gray-400">
                           {member.manager_name || '-'}
                         </td>

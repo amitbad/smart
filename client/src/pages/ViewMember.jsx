@@ -126,6 +126,12 @@ export default function ViewMember() {
                       <span>Level {member.level}</span>
                     </div>
                   )}
+                  {member.location && (
+                    <div className="flex items-center gap-2 text-gray-400">
+                      <Briefcase size={16} />
+                      <span>Location: {member.location}</span>
+                    </div>
+                  )}
                   {member.manager_name && (
                     <div className="flex items-center gap-2 text-gray-400">
                       <User size={16} />

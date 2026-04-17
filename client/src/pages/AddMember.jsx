@@ -14,12 +14,14 @@ export default function AddMember() {
     email: '',
     designation: '',
     level: '',
-    manager_id: ''
+    manager_id: '',
+    location_id: ''
   });
 
   const [selectedSkills, setSelectedSkills] = useState([]);
   const [availableSkills, setAvailableSkills] = useState([]);
   const [designations, setDesignations] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [designationInput, setDesignationInput] = useState('');
   const [managers, setManagers] = useState([]);
   const [rmEnabled, setRmEnabled] = useState(false);
@@ -37,6 +39,7 @@ export default function AddMember() {
     fetchSkills();
     fetchManagers();
     fetchDesignations();
+    fetchLocations();
   }, []);
 
   useEffect(() => {
@@ -65,6 +68,15 @@ export default function AddMember() {
       setDesignations(res.data || []);
     } catch (e) {
       // silent fail, still allow manual entry
+    }
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const res = await axios.get('/api/locations');
+      setLocations(res.data || []);
+    } catch (e) {
+      toast.error('Failed to load locations');
     }
   };
 
@@ -135,6 +147,7 @@ export default function AddMember() {
         ...formData,
         level: formData.level || null,
         manager_id: rmEnabled && formData.manager_id ? formData.manager_id : null,
+        location_id: formData.location_id || null,
         skills: selectedSkills
       });
 
@@ -264,6 +277,21 @@ export default function AddMember() {
                   className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
                   placeholder="e.g., A1, A2, 3, 10"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Location</label>
+                <select
+                  name="location_id"
+                  value={formData.location_id}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                >
+                  <option value="">Select city</option>
+                  {locations.map(location => (
+                    <option key={location.id} value={location.id}>{location.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="col-span-2">
