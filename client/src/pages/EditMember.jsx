@@ -93,7 +93,6 @@ export default function EditMember() {
     if (!selectedSkills.includes(skillId)) {
       setSelectedSkills(prev => [...prev, skillId]);
     }
-    setSkillDropdownOpen(false);
   };
 
   const requestRemoveSkill = (skillId) => {
@@ -181,8 +180,9 @@ export default function EditMember() {
       </header>
 
       <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-3xl">
-          <form onSubmit={handleSubmit} className="bg-black rounded-lg border border-gray-800 p-6">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Member Details */}
+          <div className="lg:col-span-2 bg-black rounded-lg border border-gray-800 p-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">
@@ -296,96 +296,108 @@ export default function EditMember() {
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
 
-              <div className="col-span-2">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-sm font-medium">Primary Skills</label>
-                </div>
-
-                {/* Selected Skills Chips */}
-                {selectedSkills.length > 0 && (
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {selectedSkills.map(skillId => {
-                      const skill = availableSkills.find(s => s.id === skillId);
-                      return skill ? (
-                        <div
-                          key={skillId}
-                          className="flex items-center gap-1 px-3 py-1 bg-cyan-600/20 text-cyan-400 rounded-full text-sm"
-                        >
-                          <span>{skill.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => requestRemoveSkill(skillId)}
-                            className="hover:text-cyan-300 ml-1"
-                            title="Remove skill"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ) : null;
-                    })}
-                  </div>
-                )}
-
-                {/* Multi-select Dropdown */}
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setSkillDropdownOpen(!skillDropdownOpen)}
-                    className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-left flex items-center justify-between hover:border-cyan-600 focus:outline-none focus:border-cyan-600"
-                  >
-                    <span className="text-gray-400">Select skills...</span>
-                    <Plus size={16} className="text-gray-500" />
-                  </button>
-
-                  {skillDropdownOpen && (
-                    <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded border border-gray-800 bg-black shadow-lg">
-                      <div className="py-1">
-                        {availableSkills.length === 0 ? (
-                          <div className="px-3 py-2 text-sm text-gray-500">No skills available. Add skills in Masters page.</div>
-                        ) : (
-                          availableSkills
-                            .filter(skill => !selectedSkills.includes(skill.id))
-                            .map(skill => (
-                              <button
-                                type="button"
-                                key={skill.id}
-                                onClick={() => handleSkillAdd(skill.id)}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900"
-                              >
-                                {skill.name}
-                              </button>
-                            ))
-                        )}
-                        {availableSkills.filter(skill => !selectedSkills.includes(skill.id)).length === 0 && selectedSkills.length > 0 && (
-                          <div className="px-3 py-2 text-sm text-gray-500">All skills selected</div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+          {/* Right Column - Skills */}
+          <div className="lg:col-span-1 bg-black rounded-lg border border-gray-800 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-cyan-400">Primary Skills</h3>
+              <span className="text-xs text-gray-500">{selectedSkills.length} selected</span>
             </div>
 
-            <div className="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-gray-800">
+            {/* Multi-select Dropdown */}
+            <div className="relative mb-4">
               <button
                 type="button"
-                onClick={() => navigate('/members')}
-                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-sm transition"
+                onClick={() => setSkillDropdownOpen(!skillDropdownOpen)}
+                className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-left flex items-center justify-between hover:border-cyan-600 focus:outline-none focus:border-cyan-600"
               >
-                Cancel
+                <span className="text-gray-400">Add skills...</span>
+                <Plus size={16} className="text-gray-500" />
               </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                <Save size={16} />
-                {saving ? 'Saving...' : 'Update Member'}
-              </button>
+
+              {skillDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded border border-gray-800 bg-black shadow-lg">
+                  <div className="py-1">
+                    {availableSkills.length === 0 ? (
+                      <div className="px-3 py-2 text-sm text-gray-500">No skills available. Add skills in Masters page.</div>
+                    ) : (
+                      availableSkills
+                        .filter(skill => !selectedSkills.includes(skill.id))
+                        .map(skill => (
+                          <button
+                            type="button"
+                            key={skill.id}
+                            onClick={() => handleSkillAdd(skill.id)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900"
+                          >
+                            {skill.name}
+                          </button>
+                        ))
+                    )}
+                    {availableSkills.filter(skill => !selectedSkills.includes(skill.id)).length === 0 && selectedSkills.length > 0 && (
+                      <div className="px-3 py-2 text-sm text-gray-500">All skills selected</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          </form>
-        </div>
+
+            {/* Selected Skills List */}
+            {selectedSkills.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                No skills selected
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {selectedSkills.map(skillId => {
+                  const skill = availableSkills.find(s => s.id === skillId);
+                  return skill ? (
+                    <div
+                      key={skillId}
+                      className="flex items-center justify-between p-3 bg-gray-900 border border-gray-800 rounded hover:border-cyan-600 transition"
+                    >
+                      <span className="text-sm">{skill.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => requestRemoveSkill(skillId)}
+                        className="text-gray-400 hover:text-red-400 transition"
+                        title="Remove skill"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : null;
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Submit Buttons */}
+          <div className="lg:col-span-3">
+            <div className="bg-black rounded-lg border border-gray-800 p-4">
+              <div className="flex items-center justify-end gap-3">
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/members')}
+                  className="px-4 py-2 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-sm transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Save size={16} />
+                  {saving ? 'Saving...' : 'Update Member'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
 
       <ConfirmDialog

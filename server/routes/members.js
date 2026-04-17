@@ -175,7 +175,16 @@ router.get('/:id', async (req, res) => {
         const department = await db.findById('departments', member.department_id);
         member.department = department?.name;
       }
-      member.skills = [];
+
+      // Fetch member skills
+      const skillsData = await db.findAll('memberSkills', { member_id: id });
+      const skillIds = skillsData.map(ms => ms.skill_id);
+      const memberSkills = [];
+      for (const skillId of skillIds) {
+        const skill = await db.findById('skills', skillId);
+        if (skill) memberSkills.push(skill);
+      }
+      member.skills = memberSkills;
 
       // Decrypt email before sending
       if (member.email) {
@@ -361,7 +370,7 @@ router.put('/:id', async (req, res) => {
       // Handle skills update for MongoDB
       if (skills !== undefined) {
         // Delete existing member_skills
-        await db.delete('memberSkills', { member_id: id });
+        await db.deleteMany('memberSkills', { member_id: id });
 
         // Add new skills
         if (skills.length > 0) {

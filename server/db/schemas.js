@@ -80,6 +80,12 @@ const skillSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now }
 });
 
+const memberSkillSchema = new mongoose.Schema({
+  member_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member', required: true },
+  skill_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Skill', required: true },
+  created_at: { type: Date, default: Date.now }
+});
+
 const goalCategorySchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true },
   created_at: { type: Date, default: Date.now }
@@ -106,5 +112,6 @@ export const Email = mongoose.model('Email', emailSchema);
 export const Bench = mongoose.model('Bench', benchSchema);
 export const ImportantLink = mongoose.model('ImportantLink', importantLinkSchema);
 export const Skill = mongoose.model('Skill', skillSchema);
+export const MemberSkill = mongoose.model('MemberSkill', memberSkillSchema);
 export const GoalCategory = mongoose.model('GoalCategory', goalCategorySchema);
 export const Goal = mongoose.model('Goal', goalSchema);

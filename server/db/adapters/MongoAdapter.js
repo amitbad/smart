@@ -1,4 +1,4 @@
-import { User, Designation, Department, Project, Member, ActionItem, Email, Bench, ImportantLink, Skill, GoalCategory, Goal } from '../schemas.js';
+import { User, Designation, Department, Project, Member, ActionItem, Email, Bench, ImportantLink, Skill, MemberSkill, GoalCategory, Goal } from '../schemas.js';
 
 class MongoAdapter {
   constructor() {
@@ -13,6 +13,7 @@ class MongoAdapter {
       bench: Bench,
       importantLinks: ImportantLink,
       skills: Skill,
+      memberSkills: MemberSkill,
       goalCategories: GoalCategory,
       goals: Goal
     };
@@ -94,6 +95,12 @@ class MongoAdapter {
     const model = this.models[collection];
     if (!model) throw new Error(`Collection ${collection} not found`);
     return await model.findByIdAndDelete(id);
+  }
+
+  async deleteMany(collection, filter = {}) {
+    const model = this.models[collection];
+    if (!model) throw new Error(`Collection ${collection} not found`);
+    return await model.deleteMany(filter);
   }
 
   async count(collection, filter = {}) {
