@@ -15,7 +15,7 @@ export default function Members() {
   const [levelFilter, setLevelFilter] = useState('');
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
+    limit: 15,
     totalRecords: 0,
     totalPages: 0
   });
@@ -165,21 +165,21 @@ export default function Members() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900">
                     <tr className="text-left text-xs text-gray-500">
-                      <th className="px-5 py-3 font-semibold">Name</th>
-                      <th className="px-5 py-3 font-semibold">Designation</th>
-                      <th className="px-5 py-3 font-semibold">Manager</th>
-                      <th className="px-5 py-3 font-semibold">Level</th>
-                      <th className="px-5 py-3 font-semibold">Skills</th>
-                      <th className="px-5 py-3 font-semibold">Actions</th>
+                      <th className="px-3 py-2 font-semibold">Name</th>
+                      <th className="px-3 py-2 font-semibold">Designation</th>
+                      <th className="px-3 py-2 font-semibold">Manager</th>
+                      <th className="px-3 py-2 font-semibold">Level</th>
+                      <th className="px-3 py-2 font-semibold">Skills</th>
+                      <th className="px-3 py-2 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
                     {members.map((member) => (
                       <tr key={member.id} className="hover:bg-gray-900 transition">
-                        <td className="px-5 py-3">
+                        <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
                             <div
-                              className={`w-8 h-8 rounded-full ${getLevelColor(
+                              className={`w-7 h-7 rounded-full ${getLevelColor(
                                 member.level
                               )} flex items-center justify-center flex-shrink-0`}
                             >
@@ -195,16 +195,16 @@ export default function Members() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3">{member.designation || '-'}</td>
-                        <td className="px-5 py-3 text-gray-400">
+                        <td className="px-3 py-2 text-sm">{member.designation || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-gray-400">
                           {member.manager_name || '-'}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-3 py-2">
                           <span className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs">
                             {member.level || '-'}
                           </span>
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-3 py-2">
                           {member.skills && member.skills.length > 0 ? (
                             <div className="relative group inline-block">
                               <span className="px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded text-xs font-medium cursor-help">
@@ -239,8 +239,8 @@ export default function Members() {
                             <span className="text-gray-500 text-xs">No skills</span>
                           )}
                         </td>
-                        <td className="px-5 py-3">
-                          <div className="flex gap-2">
+                        <td className="px-3 py-2">
+                          <div className="flex gap-1.5">
                             <button
                               onClick={() => navigate(`/members/${member.id}`)}
                               className="text-cyan-400 hover:text-cyan-300 transition"
@@ -270,7 +270,7 @@ export default function Members() {
                 </table>
               </div>
 
-              <div className="flex items-center justify-between p-4 border-t border-gray-800">
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800">
                 <div className="text-sm text-gray-400">
                   Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
                   {Math.min(pagination.page * pagination.limit, pagination.totalRecords)} of{' '}

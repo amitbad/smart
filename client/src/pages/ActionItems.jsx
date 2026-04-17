@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye, MessageSquarePlus, MessageSquare, MoreVertical } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Filter, Bell, Copy, ExternalLink, Eye, MessageSquarePlus, MessageSquare, MoreVertical, X } from 'lucide-react';
 import axios from 'axios';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
 import { useToast } from '../components/ToastContainer';
@@ -41,6 +41,7 @@ export default function ActionItems() {
   const [openActionMenuId, setOpenActionMenuId] = useState(null);
   const [editingPriorityId, setEditingPriorityId] = useState(null);
   const [editingStatusId, setEditingStatusId] = useState(null);
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState(new Set());
 
   const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
@@ -211,7 +212,26 @@ export default function ActionItems() {
     });
   };
 
-  const todaysItems = useMemo(() => items.filter(it => normalizeDateKey(it.action_date) === today), [items, today]);
+  const rawTodaysItems = useMemo(() => items.filter(it => normalizeDateKey(it.action_date) === today), [items, today]);
+  const todaysItems = useMemo(
+    () => rawTodaysItems.filter(it => !dismissedNotificationIds.has(it.id)),
+    [rawTodaysItems, dismissedNotificationIds]
+  );
+
+  useEffect(() => {
+    setDismissedNotificationIds(prev => {
+      const next = new Set();
+      const validIds = new Set(rawTodaysItems.map(it => it.id));
+      prev.forEach(id => {
+        if (validIds.has(id)) next.add(id);
+      });
+      return next;
+    });
+  }, [rawTodaysItems]);
+
+  const dismissNotificationItem = (id) => {
+    setDismissedNotificationIds(prev => new Set([...prev, id]));
+  };
 
   const openAdd = () => { setEditing(null); setForm({ action_date: today, description: '', priority: 'Medium', status: 'Not Started', dependency_member_ids: [], reference_link: '' }); setModalOpen(true); setLockModal(true); };
   const openEdit = (it) => {
@@ -324,18 +344,40 @@ export default function ActionItems() {
               )}
             </button>
             {notifOpen && (
-              <div className="absolute right-0 mt-2 w-96 bg-black border border-gray-800 rounded shadow-lg z-20">
-                <div className="px-3 py-2 border-b border-gray-800 text-sm text-gray-400">Today's Action Items</div>
-                <div className="max-h-72 overflow-auto">
+              <div className="absolute right-0 mt-2 w-96 bg-gray-950 border border-gray-700 rounded-lg shadow-2xl ring-1 ring-gray-700/70 z-20 overflow-hidden">
+                <div className="px-3 py-2 border-b border-gray-800 text-sm text-gray-300 flex items-center justify-between bg-gradient-to-b from-gray-900 to-gray-950">
+                  <span>Today's Action Items</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setNotifOpen(false);
+                    }}
+                    className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800 transition"
+                    title="Close notifications"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="max-h-72 overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600/50 hover:scrollbar-thumb-gray-500/70">
                   {todaysItems.length === 0 ? (
                     <div className="px-4 py-6 text-center text-gray-500 text-sm">No action items for today</div>
                   ) : (
                     todaysItems.map(it => (
-                      <div key={it.id} className="px-3 py-2 flex items-start gap-2 hover:bg-gray-900 cursor-pointer" title={it.description} onClick={() => { setNotifOpen(false); openEdit(it); }}>
+                      <div key={it.id} className="px-3 py-2 flex items-start gap-3 hover:bg-gray-900/80 cursor-pointer border-b border-gray-900 last:border-b-0 group" title={it.description} onClick={() => { setNotifOpen(false); openEdit(it); }}>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm text-gray-200 truncate">{it.description}</div>
                           <div className="mt-1"><Pill text={it.priority} kind="priority" /></div>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            dismissNotificationItem(it.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 p-1 rounded hover:bg-gray-800 flex-shrink-0 transition-all"
+                          title="Dismiss notification"
+                        >
+                          <X size={14} />
+                        </button>
                       </div>
                     ))
                   )}
