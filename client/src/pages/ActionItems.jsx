@@ -66,9 +66,17 @@ export default function ActionItems() {
     finally { setLoading(false); }
   };
 
+  const normalizeDateKey = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d)) return value; // fallback if already normalized
+    return d.toISOString().slice(0, 10);
+  };
+
   const grouped = useMemo(() => {
     const byDate = items.reduce((acc, it) => {
-      (acc[it.action_date] = acc[it.action_date] || []).push(it);
+      const key = normalizeDateKey(it.action_date);
+      (acc[key] = acc[key] || []).push(it);
       return acc;
     }, {});
     // sort dates desc and limit to last 5 working dates
@@ -90,6 +98,8 @@ export default function ActionItems() {
   }, [grouped, today]);
 
   const toggleDateCollapse = (date) => {
+    // Do not allow collapsing today's group
+    if (date === today) return;
     setCollapsedDates(prev => {
       const newSet = new Set(prev);
       if (newSet.has(date)) {
@@ -101,7 +111,7 @@ export default function ActionItems() {
     });
   };
 
-  const todaysItems = useMemo(() => items.filter(it => it.action_date === today), [items, today]);
+  const todaysItems = useMemo(() => items.filter(it => normalizeDateKey(it.action_date) === today), [items, today]);
 
   const openAdd = () => { setEditing(null); setForm({ action_date: today, description: '', priority: 'Medium', status: 'Not Started', dependency_member_ids: [], reference_link: '' }); setModalOpen(true); setLockModal(true); };
   const openEdit = (it) => {
@@ -276,10 +286,11 @@ export default function ActionItems() {
                 <div className="flex items-center gap-2 mb-2">
                   <button
                     onClick={() => toggleDateCollapse(date)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                    title={isCollapsed ? 'Expand' : 'Collapse'}
+                    className={`text-gray-400 ${isToday ? 'cursor-default opacity-60' : 'hover:text-white'} transition-colors`}
+                    title={isToday ? 'Today is always expanded' : (isCollapsed ? 'Expand' : 'Collapse')}
+                    disabled={isToday}
                   >
-                    {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                    {isCollapsed && !isToday ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
                   </button>
                   <div className="text-sm text-gray-400">
                     {new Date(date).toDateString()}
@@ -301,12 +312,15 @@ export default function ActionItems() {
                       </thead>
                       <tbody className="divide-y divide-gray-800">
                         {rows.map(it => (
-                          <tr key={it.id} className="hover:bg-gray-900">
+                          <tr
+                            key={it.id}
+                            className={`hover:bg-gray-900 ${it.status === 'Completed' ? 'opacity-60' : ''}`}
+                          >
                             <td className="px-4 py-2 max-w-[420px]">
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => openViewDetails(it)}
-                                  className="text-left truncate hover:text-cyan-400 transition-colors flex-1"
+                                  className={`text-left truncate transition-colors flex-1 ${it.status === 'Completed' ? 'text-gray-500 hover:text-gray-400' : 'hover:text-cyan-400'}`}
                                   title="Click to view details"
                                 >
                                   {it.description}
