@@ -12,9 +12,11 @@ import projectRoutes from './routes/projects.js';
 import emailRoutes from './routes/emails.js';
 import benchRoutes from './routes/bench.js';
 import importantLinksRoutes from './routes/importantLinks.js';
+import importantEventsRoutes from './routes/importantEvents.js';
 import authRoutes from './routes/auth.js';
 import goalCategoriesRoutes from './routes/goalCategories.js';
 import goalsRoutes from './routes/goals.js';
+import smartNotesRoutes from './routes/smartNotes.js';
 
 dotenv.config();
 
@@ -35,8 +37,10 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/emails', emailRoutes);
 app.use('/api/bench', benchRoutes);
 app.use('/api/important-links', importantLinksRoutes);
+app.use('/api/important-events', importantEventsRoutes);
 app.use('/api/goal-categories', goalCategoriesRoutes);
 app.use('/api/goals', goalsRoutes);
+app.use('/api/smart-notes', smartNotesRoutes);
 
 app.get('/api/health', (req, res) => {
   const dbType = getDBType();

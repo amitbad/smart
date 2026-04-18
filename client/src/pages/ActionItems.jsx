@@ -432,16 +432,18 @@ export default function ActionItems() {
                             </td>
                             <td className="px-4 py-2">
                               {editingPriorityId === it.id ? (
-                                <select
-                                  autoFocus
-                                  className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
-                                  value={it.priority}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => updateQuick(it, 'priority', e.target.value)}
-                                  onBlur={() => setEditingPriorityId(null)}
-                                >
-                                  {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
+                                <div data-priority-id={it.id}>
+                                  <select
+                                    autoFocus
+                                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                    value={it.priority}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => updateQuick(it, 'priority', e.target.value)}
+                                    onBlur={() => setEditingPriorityId(null)}
+                                  >
+                                    {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                                  </select>
+                                </div>
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <Pill text={it.priority} kind="priority" />
@@ -470,16 +472,18 @@ export default function ActionItems() {
                             </td>
                             <td className="px-4 py-2">
                               {editingStatusId === it.id ? (
-                                <select
-                                  autoFocus
-                                  className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
-                                  value={it.status}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={(e) => updateQuick(it, 'status', e.target.value)}
-                                  onBlur={() => setEditingStatusId(null)}
-                                >
-                                  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                                <div data-status-id={it.id}>
+                                  <select
+                                    autoFocus
+                                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                    value={it.status}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => updateQuick(it, 'status', e.target.value)}
+                                    onBlur={() => setEditingStatusId(null)}
+                                  >
+                                    {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                                  </select>
+                                </div>
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <Pill text={it.status} />
@@ -499,7 +503,7 @@ export default function ActionItems() {
                             </td>
                             <td className="px-4 py-2 overflow-visible">
                               <div className="flex items-center gap-2">
-                                <div className="relative">
+                                <div className="relative" data-menu-id={it.id}>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

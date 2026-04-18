@@ -15,7 +15,9 @@ import Masters from './pages/Masters';
 import Emails from './pages/Emails';
 import Bench from './pages/Bench';
 import ImportantLinks from './pages/ImportantLinks';
+import ImportantEvents from './pages/ImportantEvents';
 import Goals from './pages/Goals';
+import SmartNotes from './pages/SmartNotes';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -73,7 +75,9 @@ function App() {
             <Route path="/emails" element={<Emails />} />
             <Route path="/bench" element={<Bench />} />
             <Route path="/important-links" element={<ImportantLinks />} />
+            <Route path="/important-events" element={<ImportantEvents />} />
             <Route path="/goals" element={<Goals />} />
+            <Route path="/smart-notes" element={<SmartNotes />} />
             <Route path="/masters" element={<Masters />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/change-password" element={<ChangePassword />} />

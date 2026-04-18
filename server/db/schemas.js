@@ -42,6 +42,19 @@ const memberSchema = new mongoose.Schema({
   updated_at: { type: Date, default: Date.now }
 });
 
+const importantEventSchema = new mongoose.Schema({
+  event_name: { type: String, required: true },
+  subject_line: { type: String, default: '' },
+  event_link: { type: String, default: '' },
+  source: { type: String, enum: ['Internal', 'External'], default: 'Internal' },
+  start_date: { type: Date, required: true },
+  end_date: { type: Date, default: null },
+  event_time: { type: String, default: '' },
+  status: { type: String, enum: ['Active', 'Deferred', 'Completed'], default: 'Active' },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
 const actionItemSchema = new mongoose.Schema({
   action_date: { type: Date, required: true },
   description: { type: String, required: true },
@@ -54,6 +67,19 @@ const actionItemSchema = new mongoose.Schema({
     created_at: { type: Date, default: Date.now }
   }],
   created_at: { type: Date, default: Date.now }
+});
+
+const smartNoteSchema = new mongoose.Schema({
+  title: { type: String, default: '' },
+  content: { type: String, required: true },
+  note_date: { type: Date, default: Date.now },
+  parsed_actions: [{
+    line_key: { type: String, required: true },
+    text: { type: String, required: true },
+    action_item_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ActionItem', default: null }
+  }],
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
 });
 
 const emailSchema = new mongoose.Schema({
@@ -119,9 +145,11 @@ export const Department = mongoose.model('Department', departmentSchema);
 export const Project = mongoose.model('Project', projectSchema);
 export const Member = mongoose.model('Member', memberSchema);
 export const ActionItem = mongoose.model('ActionItem', actionItemSchema);
+export const SmartNote = mongoose.model('SmartNote', smartNoteSchema);
 export const Email = mongoose.model('Email', emailSchema);
 export const Bench = mongoose.model('Bench', benchSchema);
 export const ImportantLink = mongoose.model('ImportantLink', importantLinkSchema);
+export const ImportantEvent = mongoose.model('ImportantEvent', importantEventSchema);
 export const Skill = mongoose.model('Skill', skillSchema);
 export const MemberSkill = mongoose.model('MemberSkill', memberSkillSchema);
 export const GoalCategory = mongoose.model('GoalCategory', goalCategorySchema);

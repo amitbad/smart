@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target, X } from 'lucide-react';
+import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target, Calendar, FileText, X } from 'lucide-react';
 import axios from 'axios';
 
 export default function Layout({ children, user, onLogout }) {
@@ -11,8 +11,16 @@ export default function Layout({ children, user, onLogout }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [todayActions, setTodayActions] = useState([]);
   const [todayEmails, setTodayEmails] = useState([]);
+  const [activeEvents, setActiveEvents] = useState([]);
   const [dismissedActionIds, setDismissedActionIds] = useState(new Set());
   const [dismissedEmailIds, setDismissedEmailIds] = useState(new Set());
+
+  const formatEventRange = (event) => {
+    const start = event?.start_date ? new Date(event.start_date).toLocaleDateString() : '';
+    const end = event?.end_date ? new Date(event.end_date).toLocaleDateString() : '';
+    if (start && end && start !== end) return `${start} - ${end}`;
+    return start || end || 'No date';
+  };
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -26,6 +34,13 @@ export default function Layout({ children, user, onLogout }) {
         const e = Array.isArray(em.data) ? em.data : [];
         setTodayActions(a);
         setTodayEmails(e);
+
+        try {
+          const eventsRes = await axios.get('/api/important-events', { params: { activeOnly: true } });
+          setActiveEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
+        } catch {
+          setActiveEvents([]);
+        }
 
         const validActionIds = new Set(a.map(item => item.id));
         const validEmailIds = new Set(e.map(item => item.id));
@@ -42,6 +57,7 @@ export default function Layout({ children, user, onLogout }) {
       } catch {
         setTodayActions([]);
         setTodayEmails([]);
+        setActiveEvents([]);
         setTodayCount(0);
       }
     };
@@ -128,6 +144,17 @@ export default function Layout({ children, user, onLogout }) {
           </Link>
 
           <Link
+            to="/important-events"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/important-events')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <Calendar size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Important Events</span>}
+          </Link>
+
+          <Link
             to="/masters"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/masters')
               ? 'bg-cyan-600 text-white'
@@ -158,6 +185,17 @@ export default function Layout({ children, user, onLogout }) {
           >
             <Target size={16} className="flex-shrink-0" />
             {!sidebarCollapsed && <span>Goals</span>}
+          </Link>
+
+          <Link
+            to="/smart-notes"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/smart-notes')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <FileText size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Smart Notes</span>}
           </Link>
 
           <Link
@@ -219,7 +257,35 @@ export default function Layout({ children, user, onLogout }) {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden bg-gray-950">
-        <div className="h-12 flex items-center justify-end px-4 border-b border-gray-800 bg-black relative">
+        <div className="h-12 flex items-center justify-between px-4 border-b border-gray-800 bg-black relative gap-3">
+          <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+            <span className="text-[11px] text-gray-500 whitespace-nowrap">Important reminders</span>
+            {activeEvents.length === 0 ? (
+              <span className="text-xs text-gray-600 whitespace-nowrap">No active events</span>
+            ) : (
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
+                {activeEvents.slice(0, 3).map((event) => (
+                  <button
+                    key={event.id}
+                    onClick={() => navigate('/important-events')}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-orange-500/10 border border-orange-500/30 text-orange-300 text-xs whitespace-nowrap hover:bg-orange-500/20"
+                    title={`${event.event_name} (${formatEventRange(event)})`}
+                  >
+                    <Calendar size={12} />
+                    <span className="max-w-[200px] truncate">{event.event_name}</span>
+                  </button>
+                ))}
+                {activeEvents.length > 3 && (
+                  <button
+                    onClick={() => navigate('/important-events')}
+                    className="px-2 py-1 rounded bg-gray-800 text-gray-300 text-xs whitespace-nowrap hover:bg-gray-700"
+                  >
+                    +{activeEvents.length - 3} more
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <button onClick={() => setNotifOpen(v => !v)} className="relative p-2 rounded hover:bg-gray-900 text-gray-300" title="Today's Items">
             <Bell size={18} />
             {todayCount > 0 && (
