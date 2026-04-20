@@ -17,7 +17,7 @@ function Pill({ text, kind }) {
 export default function ActionItems() {
   const toast = useToast();
   const [items, setItems] = useState([]);
-  const [filters, setFilters] = useState({ date: '', priority: '', status: '', dependency: '' });
+  const [filters, setFilters] = useState({ date: '', priority: '', status: '', query: '' });
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [lockModal, setLockModal] = useState(true);
@@ -179,7 +179,11 @@ export default function ActionItems() {
   };
 
   const grouped = useMemo(() => {
-    const byDate = items.reduce((acc, it) => {
+    // Apply client-side text filter on description if provided
+    const q = (filters.query || '').trim().toLowerCase();
+    const base = q ? items.filter(it => (it.description || '').toLowerCase().includes(q)) : items;
+
+    const byDate = base.reduce((acc, it) => {
       const key = normalizeDateKey(it.action_date);
       (acc[key] = acc[key] || []).push(it);
       return acc;
@@ -187,7 +191,7 @@ export default function ActionItems() {
     // sort dates desc and limit to last 7 working dates
     const sortedDates = Object.entries(byDate).sort((a, b) => new Date(b[0]) - new Date(a[0]));
     return sortedDates.slice(0, 7);
-  }, [items]);
+  }, [items, filters.query]);
 
   // Initialize collapsed state: collapse all except the latest/current date
   useEffect(() => {
@@ -406,30 +410,33 @@ export default function ActionItems() {
       </header>
 
       <div className="p-4 border-b border-gray-800 bg-black">
-        <div className="grid grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Date</label>
-            <input type="date" value={filters.date} onChange={(e) => setFilters(f => ({ ...f, date: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm" />
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="block text-xs text-gray-400 mb-1">Search</label>
+            <input
+              type="text"
+              value={filters.query}
+              onChange={(e) => setFilters(f => ({ ...f, query: e.target.value }))}
+              placeholder="Filter by text in action item..."
+              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm"
+            />
           </div>
-          <div>
+          <div className="w-32">
+            <label className="block text-xs text-gray-400 mb-1">Date</label>
+            <input type="date" value={filters.date} onChange={(e) => setFilters(f => ({ ...f, date: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-sm" />
+          </div>
+          <div className="w-28">
             <label className="block text-xs text-gray-400 mb-1">Priority</label>
-            <select value={filters.priority} onChange={(e) => setFilters(f => ({ ...f, priority: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
+            <select value={filters.priority} onChange={(e) => setFilters(f => ({ ...f, priority: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-sm">
               <option value="">All</option>
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
-          <div>
+          <div className="w-32">
             <label className="block text-xs text-gray-400 mb-1">Status</label>
-            <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
+            <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-sm">
               <option value="">All</option>
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-400 mb-1">Dependency</label>
-            <select value={filters.dependency} onChange={(e) => setFilters(f => ({ ...f, dependency: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm">
-              <option value="">All</option>
-              {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.designation ? ` (${m.designation})` : ''}</option>)}
             </select>
           </div>
         </div>
@@ -514,12 +521,12 @@ export default function ActionItems() {
                                 <button
                                   onClick={() => !it.is_moved && openViewDetails(it)}
                                   className={`text-left truncate transition-colors flex-1 ${it.is_moved
-                                      ? 'line-through text-gray-600'
-                                      : it.status === 'Deferred'
-                                        ? 'line-through text-gray-500 hover:text-gray-400'
-                                        : it.status === 'Completed'
-                                          ? 'text-gray-500 hover:text-gray-400'
-                                          : 'hover:text-cyan-400'
+                                    ? 'line-through text-gray-600'
+                                    : it.status === 'Deferred'
+                                      ? 'line-through text-gray-500 hover:text-gray-400'
+                                      : it.status === 'Completed'
+                                        ? 'text-gray-500 hover:text-gray-400'
+                                        : 'hover:text-cyan-400'
                                     }`}
                                   title={it.is_moved ? 'This item has been moved forward' : 'Click to view details'}
                                   disabled={it.is_moved}
