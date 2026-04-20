@@ -493,11 +493,11 @@ export default function ActionItems() {
                       <thead className="bg-gray-800 text-xs text-gray-400">
                         <tr>
                           <th className="px-3 py-2 text-left w-10">#</th>
-                          <th className="px-4 py-2 text-left">Action Item</th>
-                          <th className="px-4 py-2 text-left">Priority</th>
-                          <th className="px-4 py-2 text-left">Dependency On</th>
-                          <th className="px-4 py-2 text-left">Status</th>
-                          <th className="px-4 py-2 text-left">Actions</th>
+                          <th className="px-4 py-2 text-left w-1/2">Action Item</th>
+                          <th className="px-4 py-2 text-left w-28">Priority</th>
+                          <th className="px-4 py-2 text-left w-40">Dependency</th>
+                          <th className="px-4 py-2 text-left w-32">Status</th>
+                          <th className="px-4 py-2 text-left w-28">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-800">
@@ -507,7 +507,7 @@ export default function ActionItems() {
                             className={`${idx % 2 === 1 ? 'bg-gray-900/40' : ''} ${it.is_moved ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-800'} ${it.status === 'Completed' ? 'opacity-60' : ''}`}
                           >
                             <td className="px-3 py-2 text-gray-500 w-10 align-top">{idx + 1}</td>
-                            <td className="px-4 py-2 max-w-[420px]">
+                            <td className="px-4 py-2 max-w-[640px]">
                               <div className="flex items-center gap-2">
                                 {selectionActiveDate === normalizeDateKey(it.action_date) && it.is_carried_forward && !it.is_moved && (
                                   <input
@@ -565,10 +565,10 @@ export default function ActionItems() {
                                       e.stopPropagation();
                                       openComments(it);
                                     }}
-                                    className="flex items-center gap-1 px-2 py-1 bg-cyan-600/20 text-cyan-300 rounded text-xs hover:bg-cyan-600/30 flex-shrink-0"
+                                    className="flex items-center gap-1 px-1.5 py-0.5 bg-cyan-600/20 text-cyan-300 rounded text-xs hover:bg-cyan-600/30 flex-shrink-0"
                                     title={`${it.comments.length} ${it.comments.length === 1 ? 'note' : 'notes'} available`}
                                   >
-                                    <MessageSquare size={14} />
+                                    <MessageSquare size={12} />
                                     <span>{it.comments.length}</span>
                                   </button>
                                 )}
@@ -605,7 +605,7 @@ export default function ActionItems() {
                                 </div>
                               )}
                             </td>
-                            <td className="px-4 py-2 text-gray-300">
+                            <td className="px-4 py-2 text-gray-400">
                               {it.dependency_member_ids?.length ? (() => {
                                 const id = it.dependency_member_ids[0];
                                 const m = members.find(mm => mm.id === id);
