@@ -12,17 +12,17 @@ export default function Dialog({ isOpen, onClose, title, children, size = 'md' }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-fade-in">
-      <div className={`bg-gray-900 border border-gray-800 rounded-xl shadow-2xl ${sizes[size]} w-full max-h-[90vh] flex flex-col animate-scale-in`}>
-        <div className="flex items-center justify-between p-4 border-b border-gray-800">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+      <div className={`bg-gray-900 border border-gray-700 rounded-xl shadow-2xl ${sizes[size]} w-full max-h-[90vh] flex flex-col animate-scale-in`}>
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-200">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-white transition p-1 rounded-lg hover:bg-gray-800"
+            className="text-gray-500 hover:text-gray-200 transition p-1 rounded-lg hover:bg-gray-800"
           >
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-6">
           {children}
         </div>
@@ -42,25 +42,25 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-fade-in">
-      <div className="bg-gray-900 border border-gray-800 rounded-xl shadow-2xl max-w-md w-full animate-scale-in">
-        <div className="flex items-center justify-between p-4 border-b border-gray-800">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+      <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl max-w-md w-full animate-scale-in">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-200">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-white transition p-1 rounded-lg hover:bg-gray-800"
+            className="text-gray-500 hover:text-gray-200 transition p-1 rounded-lg hover:bg-gray-800"
           >
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="p-6">
           <p className="text-gray-300 text-sm">{message}</p>
         </div>
 
-        <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-800">
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-700">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm transition"
+            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-100 rounded-lg text-sm transition"
           >
             {cancelText}
           </button>
@@ -69,7 +69,7 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
               onConfirm();
               onClose();
             }}
-            className={`px-4 py-2 ${buttonColors[type]} text-white rounded-lg text-sm transition`}
+            className={`px-4 py-2 ${buttonColors[type]} text-gray-100 rounded-lg text-sm transition`}
           >
             {confirmText}
           </button>

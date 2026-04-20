@@ -597,7 +597,7 @@ export default function ActionItems() {
                                       setEditingStatusId(null);
                                       setEditingPriorityId(it.id);
                                     }}
-                                    className="text-gray-500 hover:text-white"
+                                    className="text-gray-500 hover:text-gray-200"
                                     title="Edit priority"
                                   >
                                     <Edit2 size={14} />
@@ -637,7 +637,7 @@ export default function ActionItems() {
                                       setEditingPriorityId(null);
                                       setEditingStatusId(it.id);
                                     }}
-                                    className="text-gray-500 hover:text-white"
+                                    className="text-gray-500 hover:text-gray-200"
                                     title="Edit status"
                                   >
                                     <Edit2 size={14} />
@@ -653,7 +653,7 @@ export default function ActionItems() {
                                       e.stopPropagation();
                                       setOpenActionMenuId(prev => prev === it.id ? null : it.id);
                                     }}
-                                    className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-800"
+                                    className="text-gray-400 hover:text-gray-200 p-1 rounded hover:bg-gray-800"
                                     title="More actions"
                                   >
                                     <MoreVertical size={16} />
