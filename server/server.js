@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cron from 'node-cron';
 import { initializeDatabase, getDBType } from './db/index.js';
+import { carryForwardActionItems } from './jobs/carryForwardActionItems.js';
 import memberRoutes from './routes/members.js';
 import skillRoutes from './routes/skills.js';
 import designationRoutes from './routes/designations.js';
@@ -55,6 +57,23 @@ const startServer = async () => {
       console.log(`📊 API available at http://localhost:${PORT}/api`);
       console.log(`💾 Database: ${getDBType()}`);
     });
+
+    // Schedule carry-forward job to run every day at 12:01 AM
+    cron.schedule('1 0 * * *', async () => {
+      console.log('⏰ Running scheduled carry-forward job...');
+      await carryForwardActionItems();
+    }, {
+      timezone: 'Asia/Kolkata'
+    });
+
+    console.log('📅 Carry-forward job scheduled: Daily at 12:01 AM IST');
+
+    // Run once on startup for testing/catch-up
+    setTimeout(async () => {
+      console.log('🔄 Running initial carry-forward check...');
+      await carryForwardActionItems();
+    }, 3000);
+
   } catch (error) {
     console.error('❌ Failed to start server:', error);
     process.exit(1);

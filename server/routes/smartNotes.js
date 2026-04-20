@@ -3,13 +3,17 @@ import { getDB, getDBType } from '../db/index.js';
 
 const router = express.Router();
 
+function stripLeadingNumbering(text) {
+  return (text || '').replace(/^\s*(\d+[\.)]\s*)+/, '').trim();
+}
+
 function parseActionLines(content = '') {
   return content
     .split(/\r?\n/)
     .map((line, index) => ({ raw: line, index }))
     .filter(({ raw }) => raw.includes('@action_item'))
     .map(({ raw, index }) => {
-      const text = raw.replace(/@action_item/gi, '').trim();
+      const text = stripLeadingNumbering(raw.replace(/@action_item/gi, '').trim());
       return {
         line_key: `${index}-${text.toLowerCase()}`,
         text,
@@ -24,10 +28,10 @@ function serializeNote(note) {
     ...note,
     detected_actions: Array.isArray(note.parsed_actions)
       ? note.parsed_actions.map(action => ({
-          line_key: action.line_key,
-          text: action.text,
-          action_item_id: action.action_item_id || null
-        }))
+        line_key: action.line_key,
+        text: action.text,
+        action_item_id: action.action_item_id || null
+      }))
       : []
   };
 }

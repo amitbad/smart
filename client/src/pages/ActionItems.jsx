@@ -39,8 +39,12 @@ export default function ActionItems() {
   const [openActionMenuId, setOpenActionMenuId] = useState(null);
   const [editingPriorityId, setEditingPriorityId] = useState(null);
   const [editingStatusId, setEditingStatusId] = useState(null);
-
   const today = new Date().toISOString().slice(0, 10);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkFromDate, setBulkFromDate] = useState('');
+  const [bulkToDate, setBulkToDate] = useState(today);
+  const [selectionActiveDate, setSelectionActiveDate] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [form, setForm] = useState({
     action_date: today,
     description: '',
@@ -176,31 +180,30 @@ export default function ActionItems() {
 
   const grouped = useMemo(() => {
     const byDate = items.reduce((acc, it) => {
-      const key = normalizeDateKey(it.visible_date || it.action_date);
+      const key = normalizeDateKey(it.action_date);
       (acc[key] = acc[key] || []).push(it);
       return acc;
     }, {});
-    // sort dates desc and limit to last 7 working dates (carry-forward will group into requested date)
+    // sort dates desc and limit to last 7 working dates
     const sortedDates = Object.entries(byDate).sort((a, b) => new Date(b[0]) - new Date(a[0]));
     return sortedDates.slice(0, 7);
   }, [items]);
 
-  // Initialize collapsed state: collapse all except today's date
+  // Initialize collapsed state: collapse all except the latest/current date
   useEffect(() => {
     if (grouped.length > 0) {
       const collapsed = new Set();
+      const latestDate = grouped[0][0]; // First entry is the latest (sorted desc)
       grouped.forEach(([date]) => {
-        if (date !== today) {
+        if (date !== latestDate) {
           collapsed.add(date);
         }
       });
       setCollapsedDates(collapsed);
     }
-  }, [grouped, today]);
+  }, [grouped]);
 
   const toggleDateCollapse = (date) => {
-    // Do not allow collapsing today's group
-    if (date === today) return;
     setCollapsedDates(prev => {
       const newSet = new Set(prev);
       if (newSet.has(date)) {
@@ -210,6 +213,88 @@ export default function ActionItems() {
       }
       return newSet;
     });
+  };
+
+  const getCarryForwardColor = (count) => {
+    if (count === 1) return 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30';
+    if (count === 2) return 'bg-orange-500/15 text-orange-300 border-orange-500/30';
+    return 'bg-red-500/15 text-red-300 border-red-500/30'; // 3x or more
+  };
+
+  const bulkUpdateCarriedItems = async (fromDate, toDate) => {
+    try {
+      const itemsToUpdate = items.filter(it =>
+        it.is_carried_forward &&
+        new Date(it.action_date).toISOString().slice(0, 10) === fromDate
+      );
+
+      if (itemsToUpdate.length === 0) {
+        toast.error('No carried forward items found for this date');
+        return;
+      }
+
+      for (const item of itemsToUpdate) {
+        await axios.put(`/api/action-items/${item.id}`, {
+          ...item,
+          action_date: toDate
+        });
+      }
+
+      toast.success(`Updated ${itemsToUpdate.length} item(s) to ${new Date(toDate).toDateString()}`);
+      fetchItems();
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to bulk update');
+    }
+  };
+
+  const openBulkUpdate = (fromDate) => {
+    setBulkFromDate(fromDate);
+    setBulkToDate(today);
+    const preselected = items
+      .filter(it => it.is_carried_forward && !it.is_moved && new Date(it.action_date).toISOString().slice(0, 10) === fromDate)
+      .map(it => it.id);
+    setSelectedIds(new Set(preselected));
+    setSelectionActiveDate(fromDate);
+    setBulkModalOpen(true);
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAllForActiveDate = () => {
+    if (!selectionActiveDate) return;
+    const allIds = items
+      .filter(it => it.is_carried_forward && !it.is_moved && new Date(it.action_date).toISOString().slice(0, 10) === selectionActiveDate)
+      .map(it => it.id);
+    setSelectedIds(new Set(allIds));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const bulkUpdateSelected = async (ids, toDate) => {
+    try {
+      const idSet = new Set(ids);
+      const itemsToUpdate = items.filter(it => idSet.has(it.id));
+      if (itemsToUpdate.length === 0) {
+        toast.error('No items selected');
+        return;
+      }
+      for (const item of itemsToUpdate) {
+        await axios.put(`/api/action-items/${item.id}`, { ...item, action_date: toDate });
+      }
+      toast.success(`Updated ${itemsToUpdate.length} item(s) to ${new Date(toDate).toDateString()}`);
+      setBulkModalOpen(false);
+      setSelectionActiveDate(null);
+      setSelectedIds(new Set());
+      fetchItems();
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to bulk update selected');
+    }
   };
 
 
@@ -361,19 +446,38 @@ export default function ActionItems() {
             const isToday = date === today;
             return (
               <div key={date} className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <button
-                    onClick={() => toggleDateCollapse(date)}
-                    className={`text-gray-400 ${isToday ? 'cursor-default opacity-60' : 'hover:text-white'} transition-colors`}
-                    title={isToday ? 'Today is always expanded' : (isCollapsed ? 'Expand' : 'Collapse')}
-                    disabled={isToday}
-                  >
-                    {isCollapsed && !isToday ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
-                  </button>
-                  <div className="text-sm text-gray-400">
-                    {new Date(date).toDateString()}
-                    {isToday && <span className="ml-2 text-xs bg-cyan-600/20 text-cyan-400 px-2 py-0.5 rounded">Today</span>}
-                    <span className="ml-2 text-xs text-gray-500">({rows.length} items)</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => toggleDateCollapse(date)}
+                      className="text-gray-400 hover:text-white transition-colors"
+                      title={isCollapsed ? 'Expand' : 'Collapse'}
+                    >
+                      {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                    </button>
+                    <div className="text-sm text-gray-400">
+                      {new Date(date).toDateString()}
+                      {isToday && <span className="ml-2 text-xs bg-cyan-600/20 text-cyan-400 px-2 py-0.5 rounded">Today</span>}
+                      <span className="ml-2 text-xs text-gray-500">({rows.length} items)</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {rows.some(it => it.is_carried_forward) && (
+                      <button
+                        onClick={() => openBulkUpdate(date)}
+                        className="text-xs px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded hover:bg-cyan-600/30 transition-colors"
+                        title="Bulk update carried forward items"
+                      >
+                        Bulk Update
+                      </button>
+                    )}
+                    {selectionActiveDate === date && rows.some(it => it.is_carried_forward && !it.is_moved) && (
+                      <>
+                        <span className="text-xs text-gray-500">{selectedIds.size} selected</span>
+                        <button onClick={selectAllForActiveDate} className="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded">Select all</button>
+                        <button onClick={clearSelection} className="text-xs px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded">Clear</button>
+                      </>
+                    )}
                   </div>
                 </div>
                 {!isCollapsed && (
@@ -392,21 +496,39 @@ export default function ActionItems() {
                         {rows.map(it => (
                           <tr
                             key={it.id}
-                            className={`hover:bg-gray-900 ${it.status === 'Completed' ? 'opacity-60' : ''}`}
+                            className={`${it.is_moved ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-900'} ${it.status === 'Completed' ? 'opacity-60' : ''}`}
                           >
                             <td className="px-4 py-2 max-w-[420px]">
                               <div className="flex items-center gap-2">
+                                {selectionActiveDate === normalizeDateKey(it.action_date) && it.is_carried_forward && !it.is_moved && (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedIds.has(it.id)}
+                                    onChange={() => toggleSelect(it.id)}
+                                    className="w-3.5 h-3.5 accent-cyan-600"
+                                    title="Select for bulk update"
+                                  />
+                                )}
                                 <button
-                                  onClick={() => openViewDetails(it)}
-                                  className={`text-left truncate transition-colors flex-1 ${it.status === 'Completed' ? 'text-gray-500 hover:text-gray-400' : 'hover:text-cyan-400'}`}
-                                  title="Click to view details"
+                                  onClick={() => !it.is_moved && openViewDetails(it)}
+                                  className={`text-left truncate transition-colors flex-1 ${it.is_moved ? 'line-through text-gray-600' : it.status === 'Completed' ? 'text-gray-500 hover:text-gray-400' : 'hover:text-cyan-400'}`}
+                                  title={it.is_moved ? 'This item has been moved forward' : 'Click to view details'}
+                                  disabled={it.is_moved}
                                 >
                                   {it.description}
                                 </button>
-                                {it.carry_forwarded_from && (
-                                  <span className="text-[11px] px-2 py-1 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30 flex items-center gap-1 flex-shrink-0" title={`Originally due on ${new Date(it.carry_forwarded_from).toDateString()}${it.carry_forwarded_days ? ` · carried for ${it.carry_forwarded_days} day(s)` : ''}`}>
+                                {it.is_moved && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-700/50 text-gray-400 border border-gray-600/30 flex-shrink-0">
+                                    Moved
+                                  </span>
+                                )}
+                                {it.is_carried_forward && !it.is_moved && (
+                                  <span
+                                    className={`text-[9px] px-1.5 py-0.5 rounded ${getCarryForwardColor(it.carry_forward_count)} border flex items-center gap-1 flex-shrink-0 cursor-help`}
+                                    title={`Originally created on ${new Date(it.original_date).toDateString()}\nCarried forward ${it.carry_forward_count} time(s)\n\nHistory:\n${it.carry_forward_history?.map((h, i) => `${i + 1}. ${new Date(h.from_date).toDateString()} → ${new Date(h.to_date).toDateString()}`).join('\n') || 'No history'}`}
+                                  >
                                     <span>Carried</span>
-                                    {it.carry_forwarded_days ? <span className="opacity-80">({it.carry_forwarded_days}d)</span> : null}
+                                    <span className="opacity-80">({it.carry_forward_count}x)</span>
                                   </span>
                                 )}
                                 {it.reference_link && (
@@ -738,6 +860,44 @@ export default function ActionItems() {
         confirmText="Delete Note"
         type="danger"
       />
+
+      <Dialog isOpen={bulkModalOpen} onClose={() => setBulkModalOpen(false)} title="Bulk update carried items">
+        <div className="space-y-4">
+          <div className="text-sm text-gray-400">
+            Update carried items from <span className="text-white font-medium">{bulkFromDate ? new Date(bulkFromDate).toDateString() : '-'}</span> to:
+          </div>
+          <div>
+            <input
+              type="date"
+              value={bulkToDate}
+              onChange={(e) => setBulkToDate(e.target.value)}
+              className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm w-full"
+            />
+          </div>
+          <div className="text-xs text-gray-500">{selectedIds.size} selected</div>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <button
+            onClick={() => setBulkModalOpen(false)}
+            className="px-3 py-1.5 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => { await bulkUpdateSelected(Array.from(selectedIds), bulkToDate); }}
+            className="px-3 py-1.5 rounded bg-cyan-600 text-white hover:bg-cyan-500 text-sm disabled:opacity-50"
+            disabled={selectedIds.size === 0}
+          >
+            Update selected
+          </button>
+          <button
+            onClick={async () => { await bulkUpdateCarriedItems(bulkFromDate, bulkToDate); setBulkModalOpen(false); setSelectionActiveDate(null); setSelectedIds(new Set()); }}
+            className="px-3 py-1.5 rounded bg-gray-800 text-gray-300 hover:bg-gray-700 text-sm"
+          >
+            Update all for date
+          </button>
+        </div>
+      </Dialog>
 
       {/* View Details Modal (Read-Only) */}
       <Dialog

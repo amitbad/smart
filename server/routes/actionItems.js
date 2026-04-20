@@ -12,47 +12,25 @@ router.get('/', async (req, res) => {
     const dbType = getDBType();
 
     const filter = {};
-    const targetDate = date ? new Date(date) : null;
-
-    if (targetDate) {
-      // Include items due on or before the requested date (for carry-forward)
-      filter.action_date = { $lte: targetDate };
-    }
+    if (date) filter.action_date = new Date(date);
     if (priority) filter.priority = priority;
     if (status) filter.status = status;
     if (dependency) filter.dependency_member_id = dependency;
 
     const actionItems = await db.findAll('actionItems', filter, { sort: { action_date: -1, created_at: -1 } });
 
-    // Decrypt reference links and compute carry-forward metadata
+    // Decrypt reference links and add carry-forward metadata
     const decryptedItems = actionItems.map(item => {
       const decryptedLink = item.reference_link ? safeDecryptUrl(item.reference_link) : null;
 
-      let visible_date = item.action_date;
-      let carry_forwarded_from = null;
-      let carry_forwarded_days = null;
-
-      if (targetDate) {
-        const itemDate = new Date(item.action_date);
-        const startTarget = new Date(targetDate);
-        const startItem = new Date(itemDate);
-        startTarget.setHours(0, 0, 0, 0);
-        startItem.setHours(0, 0, 0, 0);
-
-        if (startItem < startTarget && item.status !== 'Completed') {
-          visible_date = startTarget;
-          carry_forwarded_from = item.action_date;
-          const diffDays = Math.max(1, Math.round((startTarget - startItem) / (1000 * 60 * 60 * 24)));
-          carry_forwarded_days = diffDays;
-        }
-      }
+      const isCarriedForward = item.original_date && item.carry_forward_history?.length > 0;
+      const carryForwardCount = item.carry_forward_history?.length || 0;
 
       return {
         ...item,
         reference_link: decryptedLink,
-        visible_date,
-        carry_forwarded_from,
-        carry_forwarded_days
+        is_carried_forward: isCarriedForward,
+        carry_forward_count: carryForwardCount
       };
     });
 
@@ -74,13 +52,16 @@ router.post('/', async (req, res) => {
     // Encrypt reference link if provided
     const encryptedLink = reference_link ? encryptUrl(reference_link) : null;
 
+    const actionDateObj = new Date(action_date);
     const newItem = await db.create('actionItems', {
-      action_date: new Date(action_date),
+      action_date: actionDateObj,
+      original_date: actionDateObj,
       description,
       priority: priority || 'Medium',
       status: status || 'Pending',
       dependency_member_id: dependency_member_id || null,
       reference_link: encryptedLink,
+      carry_forward_history: [],
       comments: Array.isArray(comments) ? comments : []
     });
 

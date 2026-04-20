@@ -57,11 +57,19 @@ const importantEventSchema = new mongoose.Schema({
 
 const actionItemSchema = new mongoose.Schema({
   action_date: { type: Date, required: true },
+  original_date: { type: Date, default: null },
   description: { type: String, required: true },
   priority: { type: String, enum: ['Low', 'Medium', 'High', 'Critical'], default: 'Medium' },
   status: { type: String, enum: ['Pending', 'Not Started', 'In Progress', 'Completed', 'Deferred', 'Put On Hold'], default: 'Pending' },
   dependency_member_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
   reference_link: { type: String, default: null },
+  is_moved: { type: Boolean, default: false },
+  carried_from_id: { type: mongoose.Schema.Types.ObjectId, ref: 'ActionItem', default: null },
+  carry_forward_history: [{
+    from_date: { type: Date, required: true },
+    to_date: { type: Date, required: true },
+    moved_at: { type: Date, default: Date.now }
+  }],
   comments: [{
     text: { type: String, required: true },
     created_at: { type: Date, default: Date.now }

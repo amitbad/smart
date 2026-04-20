@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { Plus, Save, FileText, Sparkles, Clock3 } from 'lucide-react';
 import { useToast } from '../components/ToastContainer';
+
+function stripLeadingNumbering(text) {
+  // Remove patterns like '1. ', '1) ', '1.abc', '2)abc', or multiple numbering tokens
+  return (text || '').replace(/^\s*(\d+[\.)]\s*)+/, '').trim();
+}
 
 function parseDetectedActions(content) {
   return (content || '')
@@ -10,7 +15,7 @@ function parseDetectedActions(content) {
     .filter(({ line }) => line.includes('@action_item'))
     .map(({ line, index }) => ({
       lineNumber: index + 1,
-      text: line.replace(/@action_item/gi, '').trim()
+      text: stripLeadingNumbering(line.replace(/@action_item/gi, '').trim())
     }))
     .filter(item => item.text);
 }
@@ -25,8 +30,27 @@ export default function SmartNotes() {
     title: '',
     content: ''
   });
+  const editorRef = useRef(null);
+  const highlighterRef = useRef(null);
+  const [tagHint, setTagHint] = useState(null); // {suggest:string, from:number, to:number}
 
   const detectedActions = useMemo(() => parseDetectedActions(form.content), [form.content]);
+
+  const highlightedHtml = useMemo(() => {
+    const escapeHtml = (s) => (s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    const withEscapes = escapeHtml(form.content);
+    // Highlight @action_item tokens
+    const withTags = withEscapes.replace(/@action_item/gi, (m) => `<span class="text-cyan-400 font-semibold">${m}</span>`);
+    return withTags;
+  }, [form.content]);
+
+  // Keep overlay scroll aligned whenever content changes
+  useEffect(() => {
+    handleScrollSync();
+  }, [form.content]);
 
   useEffect(() => {
     fetchNotes();
@@ -53,6 +77,65 @@ export default function SmartNotes() {
     }
   };
 
+  const handleScrollSync = () => {
+    if (editorRef.current && highlighterRef.current) {
+      highlighterRef.current.scrollTop = editorRef.current.scrollTop;
+      highlighterRef.current.scrollLeft = editorRef.current.scrollLeft;
+    }
+  };
+
+  const ACTION_TAG = '@action_item';
+
+  function getTokenAtPosition(text, pos) {
+    if (!text || pos == null) return { start: pos, end: pos, token: '' };
+    const isSpace = (ch) => /\s/.test(ch);
+    let start = pos;
+    while (start > 0 && !isSpace(text[start - 1])) start--;
+    let end = pos;
+    while (end < text.length && !isSpace(text[end])) end++;
+    const token = text.slice(start, end);
+    return { start, end, token };
+  }
+
+  const handleEditorKeyDown = (e) => {
+    if (e.key === 'Tab' && editorRef.current) {
+      const el = editorRef.current;
+      const { selectionStart } = el;
+      const { start, end, token } = getTokenAtPosition(el.value, selectionStart);
+      const lower = token.toLowerCase();
+      if (lower.startsWith('@') && ACTION_TAG.startsWith(lower)) {
+        e.preventDefault();
+        const before = el.value.slice(0, start);
+        const after = el.value.slice(end);
+        const insert = ACTION_TAG + ' ';
+        const next = before + insert + after;
+        setForm(prev => ({ ...prev, content: next }));
+        // Place caret after inserted tag + space
+        const nextPos = before.length + insert.length;
+        requestAnimationFrame(() => {
+          el.focus();
+          el.setSelectionRange(nextPos, nextPos);
+        });
+        setTagHint(null);
+      }
+    }
+  };
+
+  const handleEditorChange = (e) => {
+    const val = e.target.value;
+    setForm(prev => ({ ...prev, content: val }));
+    if (editorRef.current) {
+      const { selectionStart } = editorRef.current;
+      const { token } = getTokenAtPosition(val, selectionStart);
+      const lower = (token || '').toLowerCase();
+      if (lower.startsWith('@') && ACTION_TAG.startsWith(lower) && lower !== ACTION_TAG) {
+        setTagHint({ suggest: ACTION_TAG.slice(lower.length) });
+      } else {
+        setTagHint(null);
+      }
+    }
+  };
+
   const resetEditor = () => {
     setSelectedNoteId(null);
     setForm({ title: '', content: '' });
@@ -64,6 +147,7 @@ export default function SmartNotes() {
       title: note.title || '',
       content: note.content || ''
     });
+    setTagHint(null);
   };
 
   const handleSave = async () => {
@@ -166,13 +250,31 @@ export default function SmartNotes() {
               </div>
               <div>
                 <label className="block text-sm mb-1">Meeting Notes</label>
-                <textarea
-                  value={form.content}
-                  onChange={(e) => setForm(prev => ({ ...prev, content: e.target.value }))}
-                  rows={22}
-                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-3 text-sm leading-6"
-                  placeholder={`Type notes naturally...\n\nExamples:\nFinalize API scope with vendor @action_item\nFollow up with HR on hiring tracker @action_item`}
-                />
+                <div className="relative">
+                  {/* Highlighter layer */}
+                  <pre
+                    ref={highlighterRef}
+                    className="absolute inset-0 pointer-events-none whitespace-pre-wrap break-words text-sm leading-6 px-3 py-3 rounded bg-gray-900 overflow-auto font-sans"
+                    dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+                  />
+                  {/* Editable layer */}
+                  <textarea
+                    ref={editorRef}
+                    value={form.content}
+                    onChange={handleEditorChange}
+                    onKeyDown={handleEditorKeyDown}
+                    onScroll={handleScrollSync}
+                    rows={22}
+                    className="w-full bg-transparent border border-gray-800 rounded px-3 py-3 text-sm leading-6 text-transparent caret-white selection:bg-cyan-600/30 relative font-sans"
+                    placeholder={`Type notes naturally...\n\nExamples:\nFinalize API scope with vendor @action_item\nFollow up with HR on hiring tracker @action_item`}
+                    style={{ WebkitTextFillColor: 'transparent' }}
+                  />
+                </div>
+                {tagHint && (
+                  <div className="mt-1 text-[11px] text-gray-500">
+                    <span className="text-cyan-400">@action_item</span> — press <span className="px-1 py-0.5 bg-gray-800 rounded border border-gray-700">Tab</span> to complete
+                  </div>
+                )}
               </div>
             </div>
 
