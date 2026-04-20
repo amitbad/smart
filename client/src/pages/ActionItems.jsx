@@ -399,17 +399,17 @@ export default function ActionItems() {
 
   return (
     <div className="flex-1 overflow-auto">
-      <header className="bg-black border-b border-gray-800 px-6 py-3 flex items-center justify-between">
+      <header className="bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-cyan-400">Action Items</h2>
-          <p className="text-xs text-gray-500 mt-0.5">Track and manage your daily action items</p>
+          <p className="text-xs text-gray-400 mt-0.5">Track and manage your daily action items</p>
         </div>
         <button onClick={openAdd} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1">
           <Plus size={14} /> Add Action Item
         </button>
       </header>
 
-      <div className="p-4 border-b border-gray-800 bg-black">
+      <div className="p-4 border-b border-gray-700 bg-gray-900">
         <div className="flex gap-3 items-end">
           <div className="flex-1">
             <label className="block text-xs text-gray-400 mb-1">Search</label>
@@ -418,23 +418,23 @@ export default function ActionItems() {
               value={filters.query}
               onChange={(e) => setFilters(f => ({ ...f, query: e.target.value }))}
               placeholder="Filter by text in action item..."
-              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm"
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm"
             />
           </div>
           <div className="w-32">
             <label className="block text-xs text-gray-400 mb-1">Date</label>
-            <input type="date" value={filters.date} onChange={(e) => setFilters(f => ({ ...f, date: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-sm" />
+            <input type="date" value={filters.date} onChange={(e) => setFilters(f => ({ ...f, date: e.target.value }))} className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm" />
           </div>
           <div className="w-28">
             <label className="block text-xs text-gray-400 mb-1">Priority</label>
-            <select value={filters.priority} onChange={(e) => setFilters(f => ({ ...f, priority: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-sm">
+            <select value={filters.priority} onChange={(e) => setFilters(f => ({ ...f, priority: e.target.value }))} className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm">
               <option value="">All</option>
               {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
           <div className="w-32">
             <label className="block text-xs text-gray-400 mb-1">Status</label>
-            <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-sm">
+            <select value={filters.status} onChange={(e) => setFilters(f => ({ ...f, status: e.target.value }))} className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-sm">
               <option value="">All</option>
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -446,7 +446,7 @@ export default function ActionItems() {
         {loading ? (
           <div className="text-gray-400">Loading...</div>
         ) : grouped.length === 0 ? (
-          <div className="text-gray-500">No action items</div>
+          <div className="text-gray-400">No action items</div>
         ) : (
           grouped.map(([date, rows]) => {
             const isCollapsed = collapsedDates.has(date);
@@ -462,17 +462,17 @@ export default function ActionItems() {
                     >
                       {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
                     </button>
-                    <div className="text-sm text-gray-400">
+                    <div className="text-sm text-gray-300">
                       {new Date(date).toDateString()}
-                      {isToday && <span className="ml-2 text-xs bg-cyan-600/20 text-cyan-400 px-2 py-0.5 rounded">Today</span>}
-                      <span className="ml-2 text-xs text-gray-500">({rows.length} items)</span>
+                      {isToday && <span className="ml-2 text-xs bg-cyan-600/20 text-cyan-300 px-2 py-0.5 rounded">Today</span>}
+                      <span className="ml-2 text-xs text-gray-400">({rows.length} items)</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {rows.some(it => it.is_carried_forward) && (
                       <button
                         onClick={() => openBulkUpdate(date)}
-                        className="text-xs px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded hover:bg-cyan-600/30 transition-colors"
+                        className="text-xs px-2 py-1 bg-cyan-600/20 text-cyan-300 rounded hover:bg-cyan-600/30 transition-colors"
                         title="Bulk update carried forward items"
                       >
                         Bulk Update
@@ -488,9 +488,9 @@ export default function ActionItems() {
                   </div>
                 </div>
                 {!isCollapsed && (
-                  <div className="bg-black border border-gray-800 rounded overflow-visible">
+                  <div className="bg-gray-900 border border-gray-700 rounded overflow-visible shadow-sm">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-900 text-xs text-gray-500">
+                      <thead className="bg-gray-800 text-xs text-gray-400">
                         <tr>
                           <th className="px-3 py-2 text-left w-10">#</th>
                           <th className="px-4 py-2 text-left">Action Item</th>
@@ -504,7 +504,7 @@ export default function ActionItems() {
                         {rows.map((it, idx) => (
                           <tr
                             key={it.id}
-                            className={`${it.is_moved ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-900'} ${it.status === 'Completed' ? 'opacity-60' : ''}`}
+                            className={`${idx % 2 === 1 ? 'bg-gray-900/40' : ''} ${it.is_moved ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-800'} ${it.status === 'Completed' ? 'opacity-60' : ''}`}
                           >
                             <td className="px-3 py-2 text-gray-500 w-10 align-top">{idx + 1}</td>
                             <td className="px-4 py-2 max-w-[420px]">
@@ -526,7 +526,7 @@ export default function ActionItems() {
                                       ? 'line-through text-gray-500 hover:text-gray-400'
                                       : it.status === 'Completed'
                                         ? 'text-gray-500 hover:text-gray-400'
-                                        : 'hover:text-cyan-400'
+                                        : 'hover:text-cyan-300'
                                     }`}
                                   title={it.is_moved ? 'This item has been moved forward' : 'Click to view details'}
                                   disabled={it.is_moved}
@@ -553,7 +553,7 @@ export default function ActionItems() {
                                       e.stopPropagation();
                                       window.open(it.reference_link, '_blank', 'noopener,noreferrer');
                                     }}
-                                    className="text-cyan-400 hover:text-cyan-300 flex-shrink-0"
+                                    className="text-cyan-300 hover:text-cyan-200 flex-shrink-0"
                                     title="Open reference link"
                                   >
                                     <ExternalLink size={16} />
@@ -565,7 +565,7 @@ export default function ActionItems() {
                                       e.stopPropagation();
                                       openComments(it);
                                     }}
-                                    className="flex items-center gap-1 px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded text-xs hover:bg-cyan-600/30 flex-shrink-0"
+                                    className="flex items-center gap-1 px-2 py-1 bg-cyan-600/20 text-cyan-300 rounded text-xs hover:bg-cyan-600/30 flex-shrink-0"
                                     title={`${it.comments.length} ${it.comments.length === 1 ? 'note' : 'notes'} available`}
                                   >
                                     <MessageSquare size={14} />
@@ -579,7 +579,7 @@ export default function ActionItems() {
                                 <div data-priority-id={it.id}>
                                   <select
                                     autoFocus
-                                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                    className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs"
                                     value={it.priority}
                                     onClick={(e) => e.stopPropagation()}
                                     onChange={(e) => updateQuick(it, 'priority', e.target.value)}
@@ -611,7 +611,7 @@ export default function ActionItems() {
                                 const m = members.find(mm => mm.id === id);
                                 return <span>{m ? `${m.name}${m.designation ? ` (${m.designation})` : ''}` : `#${id}`}</span>;
                               })() : (
-                                <span className="text-gray-500 text-xs">None</span>
+                                <span className="text-gray-400 text-xs">None</span>
                               )}
                             </td>
                             <td className="px-4 py-2">
@@ -619,7 +619,7 @@ export default function ActionItems() {
                                 <div data-status-id={it.id}>
                                   <select
                                     autoFocus
-                                    className="bg-gray-900 border border-gray-800 rounded px-2 py-1 text-xs"
+                                    className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs"
                                     value={it.status}
                                     onClick={(e) => e.stopPropagation()}
                                     onChange={(e) => updateQuick(it, 'status', e.target.value)}
@@ -660,7 +660,7 @@ export default function ActionItems() {
                                   </button>
                                   {openActionMenuId === it.id && (
                                     <div
-                                      className="absolute right-0 mt-1 w-44 bg-black border border-gray-800 rounded shadow-lg z-50 py-1"
+                                      className="absolute right-0 mt-1 w-44 bg-gray-900 border border-gray-700 rounded shadow-lg z-50 py-1"
                                       onClick={(e) => e.stopPropagation()}
                                     >
                                       <button onClick={() => { setOpenActionMenuId(null); openViewDetails(it); }} className="w-full text-left px-3 py-2 text-sm hover:bg-gray-900 flex items-center gap-2">
