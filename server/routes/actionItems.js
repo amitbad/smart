@@ -12,18 +12,49 @@ router.get('/', async (req, res) => {
     const dbType = getDBType();
 
     const filter = {};
-    if (date) filter.action_date = new Date(date);
+    const targetDate = date ? new Date(date) : null;
+
+    if (targetDate) {
+      // Include items due on or before the requested date (for carry-forward)
+      filter.action_date = { $lte: targetDate };
+    }
     if (priority) filter.priority = priority;
     if (status) filter.status = status;
     if (dependency) filter.dependency_member_id = dependency;
 
     const actionItems = await db.findAll('actionItems', filter, { sort: { action_date: -1, created_at: -1 } });
 
-    // Decrypt reference links before sending to client (handles both encrypted and plain text)
-    const decryptedItems = actionItems.map(item => ({
-      ...item,
-      reference_link: item.reference_link ? safeDecryptUrl(item.reference_link) : null
-    }));
+    // Decrypt reference links and compute carry-forward metadata
+    const decryptedItems = actionItems.map(item => {
+      const decryptedLink = item.reference_link ? safeDecryptUrl(item.reference_link) : null;
+
+      let visible_date = item.action_date;
+      let carry_forwarded_from = null;
+      let carry_forwarded_days = null;
+
+      if (targetDate) {
+        const itemDate = new Date(item.action_date);
+        const startTarget = new Date(targetDate);
+        const startItem = new Date(itemDate);
+        startTarget.setHours(0, 0, 0, 0);
+        startItem.setHours(0, 0, 0, 0);
+
+        if (startItem < startTarget && item.status !== 'Completed') {
+          visible_date = startTarget;
+          carry_forwarded_from = item.action_date;
+          const diffDays = Math.max(1, Math.round((startTarget - startItem) / (1000 * 60 * 60 * 24)));
+          carry_forwarded_days = diffDays;
+        }
+      }
+
+      return {
+        ...item,
+        reference_link: decryptedLink,
+        visible_date,
+        carry_forwarded_from,
+        carry_forwarded_days
+      };
+    });
 
     res.json(decryptedItems);
   } catch (err) {

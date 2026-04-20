@@ -176,13 +176,13 @@ export default function ActionItems() {
 
   const grouped = useMemo(() => {
     const byDate = items.reduce((acc, it) => {
-      const key = normalizeDateKey(it.action_date);
+      const key = normalizeDateKey(it.visible_date || it.action_date);
       (acc[key] = acc[key] || []).push(it);
       return acc;
     }, {});
-    // sort dates desc and limit to last 5 working dates
+    // sort dates desc and limit to last 7 working dates (carry-forward will group into requested date)
     const sortedDates = Object.entries(byDate).sort((a, b) => new Date(b[0]) - new Date(a[0]));
-    return sortedDates.slice(0, 5);
+    return sortedDates.slice(0, 7);
   }, [items]);
 
   // Initialize collapsed state: collapse all except today's date
@@ -403,6 +403,12 @@ export default function ActionItems() {
                                 >
                                   {it.description}
                                 </button>
+                                {it.carry_forwarded_from && (
+                                  <span className="text-[11px] px-2 py-1 rounded bg-orange-500/15 text-orange-300 border border-orange-500/30 flex items-center gap-1 flex-shrink-0" title={`Originally due on ${new Date(it.carry_forwarded_from).toDateString()}${it.carry_forwarded_days ? ` · carried for ${it.carry_forwarded_days} day(s)` : ''}`}>
+                                    <span>Carried</span>
+                                    {it.carry_forwarded_days ? <span className="opacity-80">({it.carry_forwarded_days}d)</span> : null}
+                                  </span>
+                                )}
                                 {it.reference_link && (
                                   <button
                                     onClick={(e) => {
