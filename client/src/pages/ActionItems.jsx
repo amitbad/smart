@@ -485,6 +485,7 @@ export default function ActionItems() {
                     <table className="w-full text-sm">
                       <thead className="bg-gray-900 text-xs text-gray-500">
                         <tr>
+                          <th className="px-3 py-2 text-left w-10">#</th>
                           <th className="px-4 py-2 text-left">Action Item</th>
                           <th className="px-4 py-2 text-left">Priority</th>
                           <th className="px-4 py-2 text-left">Dependency On</th>
@@ -493,11 +494,12 @@ export default function ActionItems() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-800">
-                        {rows.map(it => (
+                        {rows.map((it, idx) => (
                           <tr
                             key={it.id}
                             className={`${it.is_moved ? 'opacity-50 pointer-events-none' : 'hover:bg-gray-900'} ${it.status === 'Completed' ? 'opacity-60' : ''}`}
                           >
+                            <td className="px-3 py-2 text-gray-500 w-10 align-top">{idx + 1}</td>
                             <td className="px-4 py-2 max-w-[420px]">
                               <div className="flex items-center gap-2">
                                 {selectionActiveDate === normalizeDateKey(it.action_date) && it.is_carried_forward && !it.is_moved && (
@@ -511,7 +513,14 @@ export default function ActionItems() {
                                 )}
                                 <button
                                   onClick={() => !it.is_moved && openViewDetails(it)}
-                                  className={`text-left truncate transition-colors flex-1 ${it.is_moved ? 'line-through text-gray-600' : it.status === 'Completed' ? 'text-gray-500 hover:text-gray-400' : 'hover:text-cyan-400'}`}
+                                  className={`text-left truncate transition-colors flex-1 ${it.is_moved
+                                      ? 'line-through text-gray-600'
+                                      : it.status === 'Deferred'
+                                        ? 'line-through text-gray-500 hover:text-gray-400'
+                                        : it.status === 'Completed'
+                                          ? 'text-gray-500 hover:text-gray-400'
+                                          : 'hover:text-cyan-400'
+                                    }`}
                                   title={it.is_moved ? 'This item has been moved forward' : 'Click to view details'}
                                   disabled={it.is_moved}
                                 >
