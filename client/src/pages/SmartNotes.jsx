@@ -25,6 +25,7 @@ export default function SmartNotes() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState(null);
   const [form, setForm] = useState({
     title: '',
@@ -33,6 +34,8 @@ export default function SmartNotes() {
   const editorRef = useRef(null);
   const highlighterRef = useRef(null);
   const [tagHint, setTagHint] = useState(null); // {suggest:string, from:number, to:number}
+  const saveTimerRef = useRef(null);
+  const lastSavedRef = useRef({ title: '', content: '', id: null });
 
   const detectedActions = useMemo(() => parseDetectedActions(form.content), [form.content]);
 
@@ -55,6 +58,25 @@ export default function SmartNotes() {
   useEffect(() => {
     fetchNotes();
   }, []);
+
+  // Debounced auto-save when content/title changes
+  useEffect(() => {
+    const dirty =
+      form.title !== lastSavedRef.current.title ||
+      form.content !== lastSavedRef.current.content ||
+      selectedNoteId !== lastSavedRef.current.id;
+    if (!dirty) return;
+    if (!form.content.trim()) return; // don't auto-save empty notes
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      autoSaveSilent();
+    }, 1200);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [form.title, form.content, selectedNoteId]);
 
   const fetchNotes = async () => {
     setLoading(true);
@@ -138,7 +160,11 @@ export default function SmartNotes() {
 
   const resetEditor = () => {
     setSelectedNoteId(null);
-    setForm({ title: '', content: '' });
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    setForm({ title: `Meeting - ${yyyy}-${mm}-${dd}`, content: '' });
   };
 
   const openNote = (note) => {
@@ -174,10 +200,31 @@ export default function SmartNotes() {
         title: saved.title || '',
         content: saved.content || ''
       });
+      lastSavedRef.current = { title: saved.title || '', content: saved.content || '', id: saved.id };
     } catch (e) {
       toast.error(e.response?.data?.error || 'Failed to save smart note');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const autoSaveSilent = async () => {
+    try {
+      setAutoSaving(true);
+      const payload = { title: form.title, content: form.content };
+      const res = selectedNoteId
+        ? await axios.put(`/api/smart-notes/${selectedNoteId}`, payload)
+        : await axios.post('/api/smart-notes', payload);
+      const saved = res.data;
+      if (!selectedNoteId) {
+        setSelectedNoteId(saved.id);
+        fetchNotes();
+      }
+      lastSavedRef.current = { title: saved.title || '', content: saved.content || '', id: saved.id };
+    } catch (e) {
+      // silent; we can surface a subtle indicator later
+    } finally {
+      setAutoSaving(false);
     }
   };
 
@@ -195,6 +242,7 @@ export default function SmartNotes() {
           <button onClick={handleSave} disabled={saving} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1 disabled:opacity-50">
             <Save size={14} /> {saving ? 'Saving...' : 'Save Note'}
           </button>
+          {autoSaving ? <span className="text-[11px] text-gray-400 ml-2">Auto-saving…</span> : null}
         </div>
       </header>
 

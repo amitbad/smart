@@ -148,6 +148,8 @@ export default function Layout({ children, user, onLogout }) {
         <nav className="flex-1 p-3 space-y-1">
           <Link
             to="/"
+            title="Hierarchy"
+            aria-label="Hierarchy"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -159,6 +161,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/emails"
+            title="Emails"
+            aria-label="Emails"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/emails')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -170,6 +174,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/bench"
+            title="Bench"
+            aria-label="Bench"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/bench')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -181,6 +187,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/important-links"
+            title="Important Links"
+            aria-label="Important Links"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/important-links')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -192,6 +200,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/important-events"
+            title="Important Events"
+            aria-label="Important Events"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/important-events')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -203,6 +213,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/masters"
+            title="Masters"
+            aria-label="Masters"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/masters')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -214,6 +226,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/action-items"
+            title="Action Items"
+            aria-label="Action Items"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/action-items')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -225,6 +239,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/goals"
+            title="Goals"
+            aria-label="Goals"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/goals')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -236,6 +252,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/smart-notes"
+            title="Smart Notes"
+            aria-label="Smart Notes"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/smart-notes')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -247,6 +265,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/interview-questions"
+            title="Questions"
+            aria-label="Questions"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/interview-questions')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -258,6 +278,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/members"
+            title="Members"
+            aria-label="Members"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/members') || location.pathname.startsWith('/members')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -269,6 +291,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/settings"
+            title="Settings"
+            aria-label="Settings"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/settings')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
@@ -280,6 +304,8 @@ export default function Layout({ children, user, onLogout }) {
 
           <Link
             to="/change-password"
+            title="Change Password"
+            aria-label="Change Password"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/change-password')
               ? 'bg-cyan-600 text-white'
               : 'text-gray-400 hover:bg-gray-900 hover:text-white'
