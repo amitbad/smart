@@ -24,8 +24,11 @@ const departmentSchema = new mongoose.Schema({
 
 const projectSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
+  active: { type: Boolean, default: true },
   delivery_manager_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
 });
 
 const memberSchema = new mongoose.Schema({
@@ -181,3 +184,31 @@ const interviewQuestionSchema = new mongoose.Schema({
 
 export const QuestionCategory = mongoose.model('QuestionCategory', questionCategorySchema);
 export const InterviewQuestion = mongoose.model('InterviewQuestion', interviewQuestionSchema);
+
+// Requirements module
+const requirementSchema = new mongoose.Schema({
+  requirement_number: { type: Number, unique: true, required: true },
+  status: { type: String, enum: ['Pending', 'Propose', 'Approved', 'Rejected', 'Booked'], default: 'Pending' },
+  engagement_start_date: { type: Date },
+  engagement_end_date: { type: Date },
+  member_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
+  project_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
+  pi_done: { type: Boolean, default: false },
+  pi_date: { type: Date },
+  pi_result: { type: String },
+  ci_done: { type: Boolean, default: false },
+  ci_date: { type: Date },
+  ci_result: { type: String },
+  requirement_link: { type: String },
+  status_logs: [{
+    status: { type: String },
+    from_status: { type: String },
+    date: { type: Date },
+    description: { type: String },
+    created_at: { type: Date, default: Date.now }
+  }],
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+export const Requirement = mongoose.model('Requirement', requirementSchema);

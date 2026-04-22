@@ -7,42 +7,51 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = '', level = '' } = req.query;
+    const { page = 1, limit = 25, search = '', level = '' } = req.query;
     const offset = (page - 1) * limit;
     const db = getDB();
     const dbType = getDBType();
 
     // MongoDB simple implementation
     if (dbType === 'Mongo') {
-      const filter = {};
-      if (search) {
-        const regex = new RegExp(search, 'i');
-        filter.$or = [
-          { name: regex },
-          { email: regex }
-        ];
-      }
-      if (level) filter.level = parseInt(level);
-
-      const totalRecords = await db.count('members', filter);
-      const members = await db.findAll('members', filter, {
+      const limitNum = parseInt(limit);
+      const pageNum = parseInt(page);
+      const rawMembers = await db.findAll('members', {}, {
         sort: { created_at: -1 },
-        limit: parseInt(limit),
-        skip: offset,
         populate: ['manager_id', 'designation_id', 'location_id', 'department_id']
       });
 
-      // Decrypt emails and shape fields (manager_name) and batch-load skills for all listed members
-      const decryptedMembers = members.map(m => ({
+      const decryptedMembers = rawMembers.map(m => ({
         ...m,
         email: m.email ? safeDecrypt(m.email) : m.email,
         manager_name: m.manager_id && typeof m.manager_id === 'object' ? m.manager_id.name : undefined,
-        location: m.location_id && typeof m.location_id === 'object' ? m.location_id.name : null
+        location: m.location_id && typeof m.location_id === 'object' ? m.location_id.name : null,
+        designation: m.designation || (m.designation_id && typeof m.designation_id === 'object' ? m.designation_id.name : m.designation)
       }));
 
+      const query = search.trim().toLowerCase();
+      let filtered = decryptedMembers;
+      if (query) {
+        filtered = filtered.filter(m => {
+          const name = (m.name || '').toLowerCase();
+          const email = (m.email || '').toLowerCase();
+          const designation = (m.designation || '').toLowerCase();
+          const managerName = (m.manager_name || '').toLowerCase();
+          return name.includes(query) || email.includes(query) || designation.includes(query) || managerName.includes(query);
+        });
+      }
+
+      if (level) {
+        const levelNum = parseInt(level);
+        filtered = filtered.filter(m => parseInt(m.level) === levelNum);
+      }
+
+      const totalRecords = filtered.length;
+      const pagedMembers = filtered.slice(offset, offset + limitNum);
+
       // Batch fetch skills for these members
-      const memberIds = decryptedMembers.map(m => m.id);
-      let membersWithSkills = decryptedMembers;
+      const memberIds = pagedMembers.map(m => m.id);
+      let membersWithSkills = pagedMembers;
       if (memberIds.length > 0) {
         const memberSkills = await db.findAll('memberSkills', { member_id: { $in: memberIds } });
         const skillIdSet = new Set(memberSkills.map(ms => ms.skill_id?.toString()));
@@ -61,7 +70,7 @@ router.get('/', async (req, res) => {
           if (skill) list.push({ id: skill.id, name: skill.name });
           byMember.set(mid, list);
         }
-        membersWithSkills = decryptedMembers.map(m => ({
+        membersWithSkills = pagedMembers.map(m => ({
           ...m,
           skills: byMember.get(m.id) || []
         }));
@@ -70,10 +79,10 @@ router.get('/', async (req, res) => {
       return res.json({
         data: membersWithSkills,
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page: pageNum,
+          limit: limitNum,
           totalRecords,
-          totalPages: Math.ceil(totalRecords / limit)
+          totalPages: Math.ceil(totalRecords / limitNum)
         }
       });
     }
@@ -84,7 +93,7 @@ router.get('/', async (req, res) => {
     let paramIndex = 1;
 
     if (search) {
-      whereClause += ` AND (m.name ILIKE $${paramIndex} OR m.email ILIKE $${paramIndex} OR m.designation ILIKE $${paramIndex})`;
+      whereClause += ` AND (m.name ILIKE $${paramIndex} OR m.email ILIKE $${paramIndex} OR m.designation ILIKE $${paramIndex} OR mgr.name ILIKE $${paramIndex})`;
       params.push(`%${search}%`);
       paramIndex++;
     }
@@ -95,7 +104,7 @@ router.get('/', async (req, res) => {
       paramIndex++;
     }
 
-    const countQuery = `SELECT COUNT(*) FROM members m ${whereClause}`;
+    const countQuery = `SELECT COUNT(*) FROM members m LEFT JOIN members mgr ON m.manager_id = mgr.id ${whereClause}`;
     const countResult = await pool.query(countQuery, params);
     const totalRecords = parseInt(countResult.rows[0].count);
 

@@ -55,7 +55,6 @@ export default function Masters() {
   const [designations, setDesignations] = useState([]);
   const [locations, setLocations] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [projects, setProjects] = useState([]);
   const [skills, setSkills] = useState([]);
   const [goalCategories, setGoalCategories] = useState([]);
   const [members, setMembers] = useState([]);
@@ -68,11 +67,10 @@ export default function Masters() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [dsg, loc, dep, pro, skl, gcat, mem] = await Promise.all([
+      const [dsg, loc, dep, skl, gcat, mem] = await Promise.all([
         axios.get('/api/designations'),
         axios.get('/api/locations'),
         axios.get('/api/departments'),
-        axios.get('/api/projects'),
         axios.get('/api/skills'),
         axios.get('/api/goal-categories'),
         axios.get('/api/members?limit=1000')
@@ -80,7 +78,6 @@ export default function Masters() {
       setDesignations(dsg.data || []);
       setLocations(loc.data || []);
       setDepartments(dep.data || []);
-      setProjects(pro.data || []);
       setSkills(skl.data || []);
       setGoalCategories(gcat.data || []);
       setMembers(mem.data?.data || []);
@@ -131,13 +128,6 @@ export default function Masters() {
     }
   };
 
-  // Projects handlers
-  const addProject = async ({ code, delivery_manager_id }) => { try { await axios.post('/api/projects', { code, delivery_manager_id }); loadAll(); toast.success('Project added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
-  const updateProject = async (id, { code, delivery_manager_id }) => { try { await axios.put(`/api/projects/${id}`, { code, delivery_manager_id }); loadAll(); toast.success('Project updated'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
-  const deleteProject = async (id) => {
-    setPendingDelete({ type: 'project', id, title: 'Delete Project?', message: 'Are you sure you want to delete this project? This action cannot be undone.' });
-    setConfirmOpen(true);
-  };
 
   // Skills handlers
   const addSkill = async (name) => { try { await axios.post('/api/skills', { name }); loadAll(); toast.success('Skill added'); } catch (e) { toast.error(e.response?.data?.error || 'Failed'); } };
@@ -203,9 +193,6 @@ export default function Masters() {
       } else if (type === 'department') {
         await axios.delete(`/api/departments/${id}`);
         toast.success('Department deleted');
-      } else if (type === 'project') {
-        await axios.delete(`/api/projects/${id}`);
-        toast.success('Project deleted');
       } else if (type === 'skill') {
         await axios.delete(`/api/skills/${id}`);
         toast.success('Skill deleted');
@@ -237,13 +224,6 @@ export default function Masters() {
               <Section title="Departments" items={departments} onAdd={addDepartment} onUpdate={updateDepartment} onDelete={deleteDepartment} />
               <Section title="Skills" items={skills} onAdd={addSkill} onUpdate={updateSkill} onDelete={deleteSkill} />
               <Section title="Goal Categories" items={goalCategories} onAdd={addGoalCategory} onUpdate={updateGoalCategory} onDelete={deleteGoalCategory} />
-              <ProjectsSection
-                items={projects}
-                members={members}
-                onAdd={addProject}
-                onUpdate={updateProject}
-                onDelete={deleteProject}
-              />
             </>
           )}
         </div>
@@ -260,58 +240,4 @@ export default function Masters() {
       />
     </>
   );
-}
-
-function ProjectsSection({ items, members, onAdd, onUpdate, onDelete }) {
-  const [code, setCode] = useState('');
-  const [dm, setDm] = useState('');
-  const [editing, setEditing] = useState(null);
-  const [editCode, setEditCode] = useState('');
-  const [editDm, setEditDm] = useState('');
-
-  return (
-    <div className="bg-black border border-gray-800 rounded p-4 md:col-span-2">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-cyan-400">Projects</h3>
-        <div className="flex items-center gap-2">
-          <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Project Code (unique)" className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm" />
-          <select value={dm} onChange={(e) => setDm(e.target.value)} className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm">
-            <option value="">Delivery Manager (optional)</option>
-            {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.designation ? ` (${m.designation})` : ''}</option>)}
-          </select>
-          <button onClick={() => { if (code.trim()) { onAdd({ code: code.trim(), delivery_manager_id: dm || null }); setCode(''); setDm(''); } }} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs flex items-center gap-1"><Plus size={14} />Add</button>
-        </div>
-      </div>
-      <ul className="divide-y divide-gray-800">
-        {items.map(it => (
-          <li key={it.id} className="flex items-center justify-between py-2">
-            {editing === it.id ? (
-              <div className="flex items-center gap-2">
-                <input value={editCode} onChange={(e) => setEditCode(e.target.value)} className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm" />
-                <select value={editDm} onChange={(e) => setEditDm(e.target.value)} className="bg-gray-900 border border-gray-800 rounded px-3 py-1.5 text-sm">
-                  <option value="">Delivery Manager (optional)</option>
-                  {members.map(m => <option key={m.id} value={m.id}>{m.name}{m.designation ? ` (${m.designation})` : ''}</option>)}
-                </select>
-                <button onClick={() => { onUpdate(it.id, { code: editCode.trim(), delivery_manager_id: editDm || null }); setEditing(null); }} className="px-2 py-1 bg-cyan-600 hover:bg-cyan-700 rounded text-xs">Save</button>
-                <button onClick={() => { setEditing(null); }} className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded text-xs">Cancel</button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3">
-                <span className="text-sm">{it.code}</span>
-                <span className="text-xs text-gray-500">{renderDM(members, it.delivery_manager_id)}</span>
-                <button onClick={() => { setEditing(it.id); setEditCode(it.code); setEditDm(it.delivery_manager_id || ''); }} className="text-gray-400 hover:text-white" title="Edit"><Pencil size={16} /></button>
-                <button onClick={() => onDelete(it.id)} className="text-gray-400 hover:text-red-400" title="Delete"><Trash2 size={16} /></button>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function renderDM(members, id) {
-  if (!id) return '—';
-  const m = members.find(mm => mm.id === id);
-  return m ? `${m.name}${m.designation ? ` (${m.designation})` : ''}` : `#${id}`;
 }

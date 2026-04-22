@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target, Calendar, FileText, X } from 'lucide-react';
+import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target, Calendar, FileText, X, ClipboardList, Folder, ChevronDown, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from './ToastContainer';
 
 export default function Layout({ children, user, onLogout }) {
   const toast = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const [todayCount, setTodayCount] = useState(0);
@@ -112,6 +113,12 @@ export default function Layout({ children, user, onLogout }) {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (location.pathname.startsWith('/masters') || location.pathname.startsWith('/projects')) {
+      setFieldsOpen(true);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     const visibleActions = todayActions.filter(a => !dismissedActionIds.has(a.id));
     const visibleEmails = todayEmails.filter(e => !dismissedEmailIds.has(e.id));
     setTodayCount(visibleActions.length + visibleEmails.length);
@@ -211,18 +218,46 @@ export default function Layout({ children, user, onLogout }) {
             {!sidebarCollapsed && <span>Important Events</span>}
           </Link>
 
-          <Link
-            to="/masters"
-            title="Masters"
-            aria-label="Masters"
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/masters')
-              ? 'bg-cyan-600 text-white'
-              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
-              }`}
-          >
-            <Layers size={16} className="flex-shrink-0" />
-            {!sidebarCollapsed && <span>Masters</span>}
-          </Link>
+          <div className="space-y-1">
+            <button
+              onClick={() => setFieldsOpen(v => !v)}
+              title="Fields"
+              aria-label="Fields"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${fieldsOpen ? 'text-gray-200' : 'text-gray-400'} hover:bg-gray-900 hover:text-white`}
+            >
+              <Layers size={16} className="flex-shrink-0" />
+              {!sidebarCollapsed && <span className="flex-1 text-left">Fields</span>}
+              {!sidebarCollapsed && (fieldsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />)}
+            </button>
+            {fieldsOpen && (
+              <div className={`space-y-1 ${sidebarCollapsed ? 'pl-0' : 'pl-6'}`}>
+                <Link
+                  to="/masters"
+                  title="Masters"
+                  aria-label="Masters"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive('/masters')
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+                    }`}
+                >
+                  <Folder size={14} className="flex-shrink-0" />
+                  {!sidebarCollapsed && <span>Masters</span>}
+                </Link>
+                <Link
+                  to="/projects"
+                  title="Projects"
+                  aria-label="Projects"
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition ${isActive('/projects')
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+                    }`}
+                >
+                  <ClipboardList size={14} className="flex-shrink-0" />
+                  {!sidebarCollapsed && <span>Projects</span>}
+                </Link>
+              </div>
+            )}
+          </div>
 
           <Link
             to="/action-items"
@@ -274,6 +309,19 @@ export default function Layout({ children, user, onLogout }) {
           >
             <FileText size={16} className="flex-shrink-0" />
             {!sidebarCollapsed && <span>Questions</span>}
+          </Link>
+
+          <Link
+            to="/requirements"
+            title="Requirements"
+            aria-label="Requirements"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/requirements')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <ClipboardList size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Requirements</span>}
           </Link>
 
           <Link

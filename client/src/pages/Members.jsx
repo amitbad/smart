@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Info } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Info, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContainer';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
@@ -15,10 +15,11 @@ export default function Members() {
   const [levelFilter, setLevelFilter] = useState('');
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 15,
+    limit: 25,
     totalRecords: 0,
     totalPages: 0
   });
+  const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, member: null });
   const [rmConfirm, setRmConfirm] = useState({ isOpen: false, member: null, dependents: 0 });
   const [detailsDialog, setDetailsDialog] = useState({ isOpen: false, title: '', content: '' });
@@ -58,6 +59,59 @@ export default function Members() {
   const handleLevelFilter = (value) => {
     setLevelFilter(value);
     setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  const requestSort = (key) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
+
+  const sortedMembers = useMemo(() => {
+    if (!sortConfig.key) return members;
+    const sorted = [...members].sort((a, b) => {
+      const getValue = (member) => {
+        switch (sortConfig.key) {
+          case 'name':
+            return member.name || '';
+          case 'designation':
+            return member.designation || '';
+          case 'location':
+            return member.location || '';
+          case 'manager':
+            return member.manager_name || '';
+          case 'level':
+            return Number(member.level) || 0;
+          case 'skills':
+            return member.skills?.[0]?.name || '';
+          default:
+            return '';
+        }
+      };
+
+      const aVal = getValue(a);
+      const bVal = getValue(b);
+
+      if (sortConfig.key === 'level') {
+        return aVal - bVal;
+      }
+
+      return String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base' });
+    });
+
+    return sortConfig.direction === 'asc' ? sorted : sorted.reverse();
+  }, [members, sortConfig]);
+
+  const renderSortIcon = (key) => {
+    if (sortConfig.key !== key) {
+      return <ArrowUpDown size={12} className="text-gray-600" />;
+    }
+    return sortConfig.direction === 'asc'
+      ? <ChevronUp size={12} className="text-cyan-400" />
+      : <ChevronDown size={12} className="text-cyan-400" />;
   };
 
   const handleDelete = async (member) => {
@@ -126,7 +180,7 @@ export default function Members() {
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Search by name, email, or designation..."
+                  placeholder="Search by name, email, manager, or designation..."
                   value={search}
                   onChange={(e) => handleSearch(e.target.value)}
                   className="w-full bg-gray-900 border border-gray-800 rounded pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-cyan-600"
@@ -166,17 +220,41 @@ export default function Members() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-900">
                     <tr className="text-left text-xs text-gray-500">
-                      <th className="px-3 py-2 font-semibold">Name</th>
-                      <th className="px-3 py-2 font-semibold">Designation</th>
-                      <th className="px-3 py-2 font-semibold">Location</th>
-                      <th className="px-3 py-2 font-semibold">Manager</th>
-                      <th className="px-3 py-2 font-semibold">Level</th>
-                      <th className="px-3 py-2 font-semibold">Skills</th>
+                      <th className="px-3 py-2 font-semibold">
+                        <button type="button" onClick={() => requestSort('name')} className="flex items-center gap-1">
+                          Name {renderSortIcon('name')}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        <button type="button" onClick={() => requestSort('designation')} className="flex items-center gap-1">
+                          Designation {renderSortIcon('designation')}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        <button type="button" onClick={() => requestSort('location')} className="flex items-center gap-1">
+                          Location {renderSortIcon('location')}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        <button type="button" onClick={() => requestSort('manager')} className="flex items-center gap-1">
+                          Manager {renderSortIcon('manager')}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        <button type="button" onClick={() => requestSort('level')} className="flex items-center gap-1">
+                          Level {renderSortIcon('level')}
+                        </button>
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        <button type="button" onClick={() => requestSort('skills')} className="flex items-center gap-1">
+                          Skills {renderSortIcon('skills')}
+                        </button>
+                      </th>
                       <th className="px-3 py-2 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
-                    {members.map((member) => (
+                    {sortedMembers.map((member) => (
                       <tr key={member.id} className="hover:bg-gray-900 transition">
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
