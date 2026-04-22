@@ -44,18 +44,53 @@ async function syncNoteActions(db, note, parsedActions) {
   for (const parsed of parsedActions) {
     const existing = previousByKey.get(parsed.line_key);
     if (existing?.action_item_id) {
-      await db.update('actionItems', existing.action_item_id, {
-        description: parsed.text,
-        action_date: new Date(note.note_date),
-        priority: 'Medium',
-        status: 'Not Started',
-        updated_at: new Date()
-      });
-      nextParsedActions.push({
-        line_key: parsed.line_key,
-        text: parsed.text,
-        action_item_id: existing.action_item_id
-      });
+      // Check if the linked action item has been modified in Action Items; if yes, do not overwrite
+      const actionItem = await db.findById('actionItems', existing.action_item_id);
+      if (actionItem) {
+        // Check if action item was modified by user (detached from Smart Notes control)
+        const hasComments = Array.isArray(actionItem.comments) && actionItem.comments.length > 0;
+        const statusChanged = actionItem.status && actionItem.status !== 'Not Started';
+        const priorityChanged = actionItem.priority && actionItem.priority !== 'Medium';
+        const hasDependency = actionItem.dependency_member_id != null;
+        const hasReferenceLink = actionItem.reference_link != null && actionItem.reference_link.trim() !== '';
+
+        // Check if description was manually edited (differs from what we last synced)
+        const descriptionChanged = (actionItem.description || '').trim() !== (existing.text || '').trim();
+
+        // Check if updated_at is significantly after created_at (indicating manual edits)
+        const createdAt = actionItem.created_at ? new Date(actionItem.created_at).getTime() : 0;
+        const updatedAt = actionItem.updated_at ? new Date(actionItem.updated_at).getTime() : 0;
+        const wasManuallyUpdated = updatedAt > 0 && (updatedAt - createdAt) > 2000; // More than 2 seconds difference
+
+        const isModified = hasComments || statusChanged || priorityChanged || hasDependency ||
+          hasReferenceLink || descriptionChanged || wasManuallyUpdated;
+
+        if (!isModified) {
+          // Safe to sync: update from Smart Notes
+          await db.update('actionItems', existing.action_item_id, {
+            description: parsed.text,
+            action_date: new Date(note.note_date),
+            priority: 'Medium',
+            status: 'Not Started',
+            updated_at: new Date()
+          });
+          nextParsedActions.push({
+            line_key: parsed.line_key,
+            text: parsed.text,
+            action_item_id: existing.action_item_id
+          });
+        } else {
+          // Item was modified by user - detach from Smart Notes control
+          // Keep the link but don't overwrite any fields, and preserve the ORIGINAL stored text
+          console.log(`✅ Detaching modified action item ${existing.action_item_id} - preserving original text`);
+          nextParsedActions.push({
+            line_key: existing.line_key, // Keep original line key
+            text: existing.text, // Keep ORIGINAL text from when it was created, not current description
+            action_item_id: existing.action_item_id,
+            detached: true // Mark as detached
+          });
+        }
+      }
       previousByKey.delete(parsed.line_key);
       continue;
     }
@@ -80,14 +115,47 @@ async function syncNoteActions(db, note, parsedActions) {
   for (const removed of previousByKey.values()) {
     if (!removed.action_item_id) continue;
     const actionItem = await db.findById('actionItems', removed.action_item_id);
-    if (actionItem && actionItem.status !== 'Completed') {
+    if (!actionItem) continue;
+
+    // Determine if the linked action item was modified after creation/sync
+    const hasComments = Array.isArray(actionItem.comments) && actionItem.comments.length > 0;
+    const statusChanged = actionItem.status && actionItem.status !== 'Not Started';
+    const priorityChanged = actionItem.priority && actionItem.priority !== 'Medium';
+    const hasDependency = actionItem.dependency_member_id != null;
+    const hasReferenceLink = actionItem.reference_link != null && actionItem.reference_link.trim() !== '';
+    const descriptionChanged = (actionItem.description || '').trim() !== (removed.text || '').trim();
+
+    const createdAt = actionItem.created_at ? new Date(actionItem.created_at).getTime() : 0;
+    const updatedAt = actionItem.updated_at ? new Date(actionItem.updated_at).getTime() : 0;
+    const wasManuallyUpdated = (updatedAt - createdAt) > 2000;
+
+    const isModified = hasComments || statusChanged || priorityChanged || hasDependency ||
+      hasReferenceLink || descriptionChanged || wasManuallyUpdated;
+
+    console.log(`🔍 Checking removed action item ${removed.action_item_id}:`, {
+      description: actionItem.description,
+      storedText: removed.text,
+      hasComments,
+      statusChanged,
+      priorityChanged,
+      hasDependency,
+      hasReferenceLink,
+      descriptionChanged,
+      wasManuallyUpdated,
+      isModified,
+      createdAt: new Date(createdAt).toISOString(),
+      updatedAt: new Date(updatedAt).toISOString(),
+      timeDiff: updatedAt - createdAt
+    });
+
+    // Only delete when it appears unmodified; otherwise preserve it
+    if (!isModified && actionItem.status !== 'Completed') {
+      console.log(`❌ Deleting unmodified action item ${removed.action_item_id}`);
       await db.delete('actionItems', removed.action_item_id);
-    } else if (actionItem) {
-      nextParsedActions.push({
-        line_key: removed.line_key,
-        text: removed.text,
-        action_item_id: removed.action_item_id
-      });
+    } else {
+      // Item was modified or completed - keep it as independent entity
+      // Don't add to nextParsedActions - fully detach from note
+      console.log(`✅ Preserving modified action item ${removed.action_item_id} - detached from Smart Notes`);
     }
   }
 
