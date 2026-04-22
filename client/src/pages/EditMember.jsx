@@ -16,7 +16,8 @@ export default function EditMember() {
     designation: '',
     level: '',
     manager_id: '',
-    location_id: ''
+    location_id: '',
+    details: ''
   });
 
   const [selectedSkills, setSelectedSkills] = useState([]);
@@ -51,7 +52,8 @@ export default function EditMember() {
         designation: member.designation || '',
         level: member.level || '',
         manager_id: member.manager_id || '',
-        location_id: member.location_id || ''
+        location_id: member.location_id || '',
+        details: member.details || ''
       });
       setSelectedSkills(member.skills?.map(s => s.id) || []);
       setLoading(false);
@@ -155,6 +157,7 @@ export default function EditMember() {
         level: formData.level || null,
         manager_id: formData.manager_id || null,
         location_id: formData.location_id || null,
+        details: formData.details || '',
         skills: selectedSkills
       });
 
@@ -307,6 +310,18 @@ export default function EditMember() {
                     <option key={location.id} value={location.id}>{location.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-2">Additional Details (optional)</label>
+                <textarea
+                  name="details"
+                  rows={5}
+                  value={formData.details}
+                  onChange={handleChange}
+                  placeholder="Use **bold** for emphasis and '- ' for bullets."
+                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                />
               </div>
 
               <div className="col-span-2">

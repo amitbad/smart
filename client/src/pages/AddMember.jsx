@@ -15,7 +15,8 @@ export default function AddMember() {
     designation: '',
     level: '',
     manager_id: '',
-    location_id: ''
+    location_id: '',
+    details: ''
   });
 
   const [selectedSkills, setSelectedSkills] = useState([]);
@@ -148,6 +149,7 @@ export default function AddMember() {
         level: formData.level || null,
         manager_id: rmEnabled && formData.manager_id ? formData.manager_id : null,
         location_id: formData.location_id || null,
+        details: formData.details || '',
         skills: selectedSkills
       });
 
@@ -292,6 +294,45 @@ export default function AddMember() {
                     <option key={location.id} value={location.id}>{location.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-2">Additional Details (optional)</label>
+                <div className="mb-2 flex items-center gap-2 text-xs">
+                  <span className="text-gray-500">Formatting:</span>
+                  <button
+                    type="button"
+                    className="px-2 py-1 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded"
+                    title="Bold"
+                    onClick={() => {
+                      setFormData(prev => {
+                        const v = prev.details || '';
+                        const add = (v && !v.endsWith('\n') ? ' ' : '') + '**bold**';
+                        return { ...prev, details: v + add };
+                      });
+                    }}
+                  >B</button>
+                  <button
+                    type="button"
+                    className="px-2 py-1 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded"
+                    title="Bulleted list"
+                    onClick={() => {
+                      setFormData(prev => {
+                        const v = prev.details || '';
+                        const add = (v && !v.endsWith('\n') ? '\n' : '') + '- item 1\n- item 2';
+                        return { ...prev, details: v + add };
+                      });
+                    }}
+                  >• List</button>
+                </div>
+                <textarea
+                  name="details"
+                  rows={5}
+                  value={formData.details}
+                  onChange={handleChange}
+                  placeholder="Use **bold** for emphasis and '- ' for bullets."
+                  className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+                />
               </div>
 
               <div className="col-span-2">

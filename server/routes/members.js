@@ -291,7 +291,7 @@ router.get('/:id/reportees', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, email, designation, level, manager_id, skills, designation_id, location_id, department_id } = req.body;
+    const { name, email, designation, level, manager_id, skills, designation_id, location_id, department_id, details } = req.body;
 
     if (!name || !email) {
       return res.status(400).json({ error: 'Name and email are required' });
@@ -313,7 +313,8 @@ router.post('/', async (req, res) => {
         manager_id: manager_id || null,
         designation_id: designation_id || null,
         location_id: location_id || null,
-        department_id: department_id || null
+        department_id: department_id || null,
+        details: details || ''
       });
 
       if (skills && skills.length > 0) {
@@ -409,7 +410,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, designation, level, manager_id, skills, designation_id, location_id, department_id } = req.body;
+    const { name, email, designation, level, manager_id, skills, designation_id, location_id, department_id, details } = req.body;
     const db = getDB();
     const dbType = getDBType();
 
@@ -424,6 +425,7 @@ router.put('/:id', async (req, res) => {
       if (designation_id !== undefined) updateData.designation_id = designation_id || null;
       if (location_id !== undefined) updateData.location_id = location_id || null;
       if (department_id !== undefined) updateData.department_id = department_id || null;
+      if (details !== undefined) updateData.details = details;
 
       const updated = await db.update('members', id, updateData);
       if (!updated) {

@@ -18,6 +18,7 @@ import ImportantLinks from './pages/ImportantLinks';
 import ImportantEvents from './pages/ImportantEvents';
 import Goals from './pages/Goals';
 import SmartNotes from './pages/SmartNotes';
+import InterviewQuestions from './pages/InterviewQuestions';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -78,6 +79,7 @@ function App() {
             <Route path="/important-events" element={<ImportantEvents />} />
             <Route path="/goals" element={<Goals />} />
             <Route path="/smart-notes" element={<SmartNotes />} />
+            <Route path="/interview-questions" element={<InterviewQuestions />} />
             <Route path="/masters" element={<Masters />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/change-password" element={<ChangePassword />} />

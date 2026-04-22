@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Network, Table, Settings, User, LogOut, Key, ListTodo, Layers, Mail, Briefcase, Bell, Link as LinkIcon, Target, Calendar, FileText, X } from 'lucide-react';
 import axios from 'axios';
+import { useToast } from './ToastContainer';
 
 export default function Layout({ children, user, onLogout }) {
+  const toast = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -14,6 +16,10 @@ export default function Layout({ children, user, onLogout }) {
   const [activeEvents, setActiveEvents] = useState([]);
   const [dismissedActionIds, setDismissedActionIds] = useState(new Set());
   const [dismissedEmailIds, setDismissedEmailIds] = useState(new Set());
+  const [eventsError, setEventsError] = useState(false);
+  const [emailsError, setEmailsError] = useState(false);
+  const [actionsError, setActionsError] = useState(false);
+  const retryRef = useState({ events: null, emails: null, actions: null })[0];
 
   const formatEventRange = (event) => {
     const start = event?.start_date ? new Date(event.start_date).toLocaleDateString() : '';
@@ -26,20 +32,52 @@ export default function Layout({ children, user, onLogout }) {
     const fetchAll = async () => {
       try {
         const today = new Date().toISOString().slice(0, 10);
-        const [ai, em] = await Promise.all([
-          axios.get('/api/action-items', { params: { date: today } }),
-          axios.get('/api/emails', { params: { reply_by: today } })
-        ]);
-        const a = Array.isArray(ai.data) ? ai.data : [];
-        const e = Array.isArray(em.data) ? em.data : [];
-        setTodayActions(a);
-        setTodayEmails(e);
+        // Action items (today)
+        try {
+          const ai = await axios.get('/api/action-items', { params: { date: today } });
+          const a = Array.isArray(ai.data) ? ai.data : [];
+          setTodayActions(a);
+          if (actionsError) toast.success('Action items are back online');
+          setActionsError(false);
+        } catch (err) {
+          setTodayActions([]);
+          setActionsError(true);
+          if (!retryRef.actions) {
+            retryRef.actions = setTimeout(() => { retryRef.actions = null; fetchAll(); }, 15000);
+          }
+        }
 
+        // Emails (today)
+        try {
+          const em = await axios.get('/api/emails', { params: { reply_by: today } });
+          const e = Array.isArray(em.data) ? em.data : [];
+          setTodayEmails(e);
+          if (emailsError) toast.success('Emails are back online');
+          setEmailsError(false);
+        } catch (err) {
+          setTodayEmails([]);
+          setEmailsError(true);
+          if (!retryRef.emails) {
+            retryRef.emails = setTimeout(() => { retryRef.emails = null; fetchAll(); }, 15000);
+          }
+        }
+        // Load important events with graceful degradation
         try {
           const eventsRes = await axios.get('/api/important-events', { params: { activeOnly: true } });
-          setActiveEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
-        } catch {
+          const ev = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+          setActiveEvents(ev);
+          if (eventsError) toast.success('Events are back online');
+          setEventsError(false);
+        } catch (err) {
+          // Transient drop (e.g., Atlas free tier). Show message and schedule retry.
           setActiveEvents([]);
+          setEventsError(true);
+          if (!retryRef.events) {
+            retryRef.events = setTimeout(() => {
+              retryRef.events = null;
+              fetchAll();
+            }, 15000);
+          }
         }
 
         const validActionIds = new Set(a.map(item => item.id));
@@ -62,6 +100,15 @@ export default function Layout({ children, user, onLogout }) {
       }
     };
     fetchAll();
+    // Auto-refresh when network comes back online
+    const handleOnline = () => fetchAll();
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      if (retryRef.events) { clearTimeout(retryRef.events); retryRef.events = null; }
+      if (retryRef.emails) { clearTimeout(retryRef.emails); retryRef.emails = null; }
+      if (retryRef.actions) { clearTimeout(retryRef.actions); retryRef.actions = null; }
+    };
   }, [location.pathname]);
 
   useEffect(() => {
@@ -199,6 +246,17 @@ export default function Layout({ children, user, onLogout }) {
           </Link>
 
           <Link
+            to="/interview-questions"
+            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/interview-questions')
+              ? 'bg-cyan-600 text-white'
+              : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+              }`}
+          >
+            <FileText size={16} className="flex-shrink-0" />
+            {!sidebarCollapsed && <span>Questions</span>}
+          </Link>
+
+          <Link
             to="/members"
             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${isActive('/members') || location.pathname.startsWith('/members')
               ? 'bg-cyan-600 text-white'
@@ -261,7 +319,33 @@ export default function Layout({ children, user, onLogout }) {
           <div className="flex items-center gap-2 min-w-0 overflow-hidden">
             <span className="text-[11px] text-gray-500 whitespace-nowrap">Important reminders</span>
             {activeEvents.length === 0 ? (
-              <span className="text-xs text-gray-600 whitespace-nowrap">No active events</span>
+              eventsError ? (
+                <div className="flex items-center gap-2 text-xs text-orange-300 whitespace-nowrap bg-orange-500/10 border border-orange-500/30 px-2 py-1 rounded">
+                  <span>Events temporarily unavailable. Retrying…</span>
+                  <button
+                    onClick={() => {
+                      if (retryRef.events) { clearTimeout(retryRef.events); retryRef.events = null; }
+                      // Force a refresh attempt now
+                      (async () => {
+                        try {
+                          const eventsRes = await axios.get('/api/important-events', { params: { activeOnly: true } });
+                          const ev = Array.isArray(eventsRes.data) ? eventsRes.data : [];
+                          setActiveEvents(ev);
+                          if (eventsError) toast.success('Events are back online');
+                          setEventsError(false);
+                        } catch {
+                          setEventsError(true);
+                        }
+                      })();
+                    }}
+                    className="px-2 py-0.5 rounded bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 text-orange-200"
+                  >
+                    Retry now
+                  </button>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-600 whitespace-nowrap">No active events</span>
+              )
             ) : (
               <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
                 {activeEvents.slice(0, 3).map((event) => (
@@ -310,7 +394,31 @@ export default function Layout({ children, user, onLogout }) {
               <div className="max-h-80 overflow-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-gray-600/50 hover:scrollbar-thumb-gray-500/70">
                 <div className="px-3 py-2 text-xs text-gray-500 font-semibold">Emails to reply today</div>
                 {todayEmails.filter(em => !dismissedEmailIds.has(em.id)).length === 0 ? (
-                  <div className="px-3 pb-2 text-xs text-gray-600">None</div>
+                  emailsError ? (
+                    <div className="px-3 pb-2">
+                      <div className="flex items-center gap-2 text-xs text-orange-300 whitespace-nowrap bg-orange-500/10 border border-orange-500/30 px-2 py-1 rounded">
+                        <span>Emails temporarily unavailable. Retrying…</span>
+                        <button
+                          onClick={async () => {
+                            if (retryRef.emails) { clearTimeout(retryRef.emails); retryRef.emails = null; }
+                            try {
+                              const today = new Date().toISOString().slice(0, 10);
+                              const em = await axios.get('/api/emails', { params: { reply_by: today } });
+                              const e = Array.isArray(em.data) ? em.data : [];
+                              setTodayEmails(e);
+                              if (emailsError) toast.success('Emails are back online');
+                              setEmailsError(false);
+                            } catch { setEmailsError(true); }
+                          }}
+                          className="px-2 py-0.5 rounded bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 text-orange-200"
+                        >
+                          Retry now
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="px-3 pb-2 text-xs text-gray-600">None</div>
+                  )
                 ) : todayEmails.filter(em => !dismissedEmailIds.has(em.id)).map(em => (
                   <div key={em.id} className="px-3 py-2 hover:bg-gray-900/80 cursor-pointer border-b border-gray-900 last:border-b-0 group flex items-start gap-3" onClick={() => { setNotifOpen(false); navigate('/emails'); }}>
                     <div className="flex-1 min-w-0">
@@ -331,7 +439,31 @@ export default function Layout({ children, user, onLogout }) {
                 ))}
                 <div className="px-3 pt-3 text-xs text-gray-500 font-semibold">Action items for today</div>
                 {todayActions.filter(ai => !dismissedActionIds.has(ai.id)).length === 0 ? (
-                  <div className="px-3 pb-3 text-xs text-gray-600">None</div>
+                  actionsError ? (
+                    <div className="px-3 pb-3">
+                      <div className="flex items-center gap-2 text-xs text-orange-300 whitespace-nowrap bg-orange-500/10 border border-orange-500/30 px-2 py-1 rounded">
+                        <span>Action items temporarily unavailable. Retrying…</span>
+                        <button
+                          onClick={async () => {
+                            if (retryRef.actions) { clearTimeout(retryRef.actions); retryRef.actions = null; }
+                            try {
+                              const today = new Date().toISOString().slice(0, 10);
+                              const ai = await axios.get('/api/action-items', { params: { date: today } });
+                              const a = Array.isArray(ai.data) ? ai.data : [];
+                              setTodayActions(a);
+                              if (actionsError) toast.success('Action items are back online');
+                              setActionsError(false);
+                            } catch { setActionsError(true); }
+                          }}
+                          className="px-2 py-0.5 rounded bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 text-orange-200"
+                        >
+                          Retry now
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="px-3 pb-3 text-xs text-gray-600">None</div>
+                  )
                 ) : todayActions.filter(ai => !dismissedActionIds.has(ai.id)).map(ai => (
                   <div key={ai.id} className="px-3 py-2 hover:bg-gray-900/80 cursor-pointer border-b border-gray-900 last:border-b-0 group flex items-start gap-3" onClick={() => { setNotifOpen(false); navigate('/action-items'); }}>
                     <div className="flex-1 min-w-0">

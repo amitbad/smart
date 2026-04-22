@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Eye, Edit, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContainer';
-import { ConfirmDialog } from '../components/Dialog';
+import Dialog, { ConfirmDialog } from '../components/Dialog';
 
 export default function Members() {
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ export default function Members() {
   });
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, member: null });
   const [rmConfirm, setRmConfirm] = useState({ isOpen: false, member: null, dependents: 0 });
+  const [detailsDialog, setDetailsDialog] = useState({ isOpen: false, title: '', content: '' });
 
   useEffect(() => {
     fetchMembers();
@@ -196,7 +197,21 @@ export default function Members() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-sm">{member.designation || '-'}</td>
+                        <td className="px-3 py-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <span>{member.designation || '-'}</span>
+                            {member.details && member.details.trim() !== '' && (
+                              <button
+                                type="button"
+                                className="text-cyan-400 hover:text-cyan-300"
+                                title="View details"
+                                onClick={() => setDetailsDialog({ isOpen: true, title: member.name, content: member.details })}
+                              >
+                                <Info size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2 text-sm text-gray-400">{member.location || '-'}</td>
                         <td className="px-3 py-2 text-sm text-gray-400">
                           {member.manager_name || '-'}
@@ -313,6 +328,24 @@ export default function Members() {
         cancelText="Cancel"
         type="danger"
       />
+
+      <Dialog
+        isOpen={detailsDialog.isOpen}
+        onClose={() => setDetailsDialog({ isOpen: false, title: '', content: '' })}
+        title={`${detailsDialog.title} — Details`}
+      >
+        <div className="prose prose-invert max-w-none">
+          <pre className="whitespace-pre-wrap text-sm text-gray-300">{detailsDialog.content}</pre>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={() => setDetailsDialog({ isOpen: false, title: '', content: '' })}
+            className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs transition"
+          >
+            Close
+          </button>
+        </div>
+      </Dialog>
 
       <ConfirmDialog
         isOpen={rmConfirm.isOpen}

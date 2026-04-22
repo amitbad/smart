@@ -38,6 +38,7 @@ const memberSchema = new mongoose.Schema({
   department_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Department' },
   level: { type: String, default: null },
   manager_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Member' },
+  details: { type: String, default: '' },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
@@ -162,3 +163,21 @@ export const Skill = mongoose.model('Skill', skillSchema);
 export const MemberSkill = mongoose.model('MemberSkill', memberSkillSchema);
 export const GoalCategory = mongoose.model('GoalCategory', goalCategorySchema);
 export const Goal = mongoose.model('Goal', goalSchema);
+
+// Interview questions module
+const questionCategorySchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+const interviewQuestionSchema = new mongoose.Schema({
+  category_id: { type: mongoose.Schema.Types.ObjectId, ref: 'QuestionCategory', required: true },
+  question_text: { type: String, required: true },
+  difficulty: { type: String, enum: ['Low', 'Medium', 'High'], default: 'Low' },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+export const QuestionCategory = mongoose.model('QuestionCategory', questionCategorySchema);
+export const InterviewQuestion = mongoose.model('InterviewQuestion', interviewQuestionSchema);

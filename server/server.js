@@ -19,6 +19,7 @@ import authRoutes from './routes/auth.js';
 import goalCategoriesRoutes from './routes/goalCategories.js';
 import goalsRoutes from './routes/goals.js';
 import smartNotesRoutes from './routes/smartNotes.js';
+import interviewQuestionsRoutes from './routes/interviewQuestions.js';
 
 dotenv.config();
 
@@ -43,6 +44,7 @@ app.use('/api/important-events', importantEventsRoutes);
 app.use('/api/goal-categories', goalCategoriesRoutes);
 app.use('/api/goals', goalsRoutes);
 app.use('/api/smart-notes', smartNotesRoutes);
+app.use('/api/interview-questions', interviewQuestionsRoutes);
 
 app.get('/api/health', (req, res) => {
   const dbType = getDBType();
