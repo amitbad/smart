@@ -48,6 +48,7 @@ coverage/
 *.temp
 .cache/
 local-notes/
+.windsurf/
 
 # OS files
 Thumbs.db

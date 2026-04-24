@@ -17,7 +17,9 @@ function toDateInput(value) {
 export default function ImportantEvents() {
   const toast = useToast();
   const [items, setItems] = useState([]);
+  const [archivedItems, setArchivedItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState({ status: '', source: '' });
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -42,8 +44,12 @@ export default function ImportantEvents() {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('/api/important-events', { params: filters });
-      setItems(res.data || []);
+      const [activeRes, archivedRes] = await Promise.all([
+        axios.get('/api/important-events', { params: { ...filters, archived: 'false' } }),
+        axios.get('/api/important-events', { params: { ...filters, archived: 'true' } })
+      ]);
+      setItems(activeRes.data || []);
+      setArchivedItems(archivedRes.data || []);
     } catch (e) {
       toast.error(e.response?.data?.error || 'Failed to load important events');
     } finally {
@@ -52,13 +58,31 @@ export default function ImportantEvents() {
   };
 
   const grouped = useMemo(() => {
-    const byDate = items.reduce((acc, it) => {
+    const source = showArchived ? archivedItems : items;
+    const byDate = source.reduce((acc, it) => {
       const key = toDateInput(it.start_date);
       (acc[key] = acc[key] || []).push(it);
       return acc;
     }, {});
     return Object.entries(byDate).sort((a, b) => new Date(a[0]) - new Date(b[0]));
-  }, [items]);
+  }, [items, archivedItems, showArchived]);
+
+  const isPast = (it) => {
+    const now = new Date();
+    const start = new Date(it.start_date);
+    const end = it.end_date ? new Date(it.end_date) : null;
+    return end ? end < now : start < now;
+  };
+
+  const toggleArchive = async (it, next = true) => {
+    try {
+      await axios.put(`/api/important-events/${it.id}/archive`, { archived: next });
+      fetchItems();
+      toast.success(next ? 'Event archived' : 'Event restored');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Failed to update archive state');
+    }
+  };
 
   const openAdd = () => {
     setEditing(null);
@@ -150,9 +174,15 @@ export default function ImportantEvents() {
           <h2 className="text-xl font-bold text-cyan-400">Important Events</h2>
           <p className="text-xs text-gray-500 mt-0.5">Track webinars and multi-day learning events with reminder statuses</p>
         </div>
-        <button onClick={openAdd} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1">
-          <Plus size={14} /> Add Event
-        </button>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1 text-xs text-gray-400">
+            <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+            <span>Show archived</span>
+          </label>
+          <button onClick={openAdd} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1">
+            <Plus size={14} /> Add Event
+          </button>
+        </div>
       </header>
 
       <div className="p-4 border-b border-gray-800 bg-black">
@@ -198,42 +228,51 @@ export default function ImportantEvents() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
-                    {rows.map(it => (
-                      <tr key={it.id} className="hover:bg-gray-900">
-                        <td className="px-4 py-2 max-w-[320px]">
-                          <div className="truncate" title={it.event_name}>{it.event_name}</div>
-                        </td>
-                        <td className="px-4 py-2 max-w-[260px]">
-                          <div className="truncate text-gray-300" title={it.subject_line || ''}>{it.subject_line || <span className="text-xs text-gray-500">—</span>}</div>
-                        </td>
-                        <td className="px-4 py-2 max-w-[280px]">
-                          {it.event_link ? (
-                            <a href={it.event_link} target="_blank" rel="noreferrer" className="text-cyan-400 hover:text-cyan-300 truncate block" title={it.event_link}>
-                              {it.event_link}
-                            </a>
-                          ) : (
-                            <span className="text-xs text-gray-500">—</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-2">{it.source}</td>
-                        <td className="px-4 py-2">
-                          {toDateInput(it.start_date)}
-                          {it.end_date ? ` to ${toDateInput(it.end_date)}` : ''}
-                        </td>
-                        <td className="px-4 py-2">{it.event_time || <span className="text-xs text-gray-500">—</span>}</td>
-                        <td className="px-4 py-2">
-                          <span className={`px-2 py-0.5 rounded text-xs ${it.status === 'Active' ? 'bg-cyan-600/20 text-cyan-400' : it.status === 'Deferred' ? 'bg-orange-600/20 text-orange-400' : 'bg-green-600/20 text-green-400'}`}>
-                            {it.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => openEdit(it)} className="text-gray-400 hover:text-white" title="Edit"><Edit2 size={16} /></button>
-                            <button onClick={() => requestDelete(it)} className="text-gray-400 hover:text-red-400" title="Delete"><Trash2 size={16} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {rows.map(it => {
+                      const past = isPast(it);
+                      const grayed = past || it.archived;
+                      return (
+                        <tr key={it.id} className={`hover:bg-gray-900 ${grayed ? 'opacity-60' : ''}`}>
+                          <td className="px-4 py-2 max-w-[320px]">
+                            <div className={`truncate ${grayed ? 'line-through text-gray-400' : ''}`} title={it.event_name}>{it.event_name}</div>
+                          </td>
+                          <td className="px-4 py-2 max-w-[260px]">
+                            <div className={`truncate ${grayed ? 'text-gray-500' : 'text-gray-300'}`} title={it.subject_line || ''}>{it.subject_line || <span className="text-xs text-gray-500">—</span>}</div>
+                          </td>
+                          <td className="px-4 py-2 max-w-[280px]">
+                            {it.event_link ? (
+                              <a href={it.event_link} target="_blank" rel="noreferrer" className={`truncate block ${grayed ? 'text-cyan-700 hover:text-cyan-600' : 'text-cyan-400 hover:text-cyan-300'}`} title={it.event_link}>
+                                {it.event_link}
+                              </a>
+                            ) : (
+                              <span className="text-xs text-gray-500">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2">{it.source}</td>
+                          <td className="px-4 py-2">
+                            {toDateInput(it.start_date)}
+                            {it.end_date ? ` to ${toDateInput(it.end_date)}` : ''}
+                          </td>
+                          <td className="px-4 py-2">{it.event_time || <span className="text-xs text-gray-500">—</span>}</td>
+                          <td className="px-4 py-2">
+                            <span className={`px-2 py-0.5 rounded text-xs ${it.status === 'Active' ? 'bg-cyan-600/20 text-cyan-400' : it.status === 'Deferred' ? 'bg-orange-600/20 text-orange-400' : 'bg-green-600/20 text-green-400'}`}>
+                              {it.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => openEdit(it)} className="text-gray-400 hover:text-white" title="Edit"><Edit2 size={16} /></button>
+                              {!it.archived ? (
+                                <button onClick={() => toggleArchive(it, true)} className="text-gray-400 hover:text-yellow-400" title="Archive">Archive</button>
+                              ) : (
+                                <button onClick={() => toggleArchive(it, false)} className="text-gray-400 hover:text-emerald-400" title="Restore">Restore</button>
+                              )}
+                              <button onClick={() => requestDelete(it)} className="text-gray-400 hover:text-red-400" title="Delete"><Trash2 size={16} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

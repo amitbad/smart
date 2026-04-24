@@ -1,4 +1,4 @@
-import { User, Designation, Location, Department, Project, Member, ActionItem, SmartNote, Email, Bench, ImportantLink, ImportantEvent, Skill, MemberSkill, GoalCategory, Goal, QuestionCategory, InterviewQuestion, Requirement } from '../schemas.js';
+import { User, Designation, Location, Department, Project, Member, ActionItem, SmartNote, Email, Bench, ImportantLink, ImportantEvent, Skill, MemberSkill, GoalCategory, Goal, QuestionCategory, InterviewQuestion, InterviewQuestionSet, InterviewSetRun, Requirement } from '../schemas.js';
 
 class MongoAdapter {
   constructor() {
@@ -21,6 +21,8 @@ class MongoAdapter {
       goals: Goal,
       questionCategories: QuestionCategory,
       interviewQuestions: InterviewQuestion,
+      interviewQuestionSets: InterviewQuestionSet,
+      interviewSetRuns: InterviewSetRun,
       requirements: Requirement
     };
   }

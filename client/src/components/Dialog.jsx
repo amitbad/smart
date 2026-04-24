@@ -31,7 +31,7 @@ export default function Dialog({ isOpen, onClose, title, children, size = 'md' }
   );
 }
 
-export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger' }) {
+export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', type = 'danger', autoCloseOnConfirm = true }) {
   if (!isOpen) return null;
 
   const buttonColors = {
@@ -65,9 +65,11 @@ export function ConfirmDialog({ isOpen, onClose, onConfirm, title, message, conf
             {cancelText}
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
+            onClick={async () => {
+              const result = await onConfirm();
+              if (autoCloseOnConfirm || result) {
+                onClose();
+              }
             }}
             className={`px-4 py-2 ${buttonColors[type]} text-gray-100 rounded-lg text-sm transition`}
           >

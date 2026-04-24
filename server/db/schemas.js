@@ -55,6 +55,7 @@ const importantEventSchema = new mongoose.Schema({
   end_date: { type: Date, default: null },
   event_time: { type: String, default: '' },
   status: { type: String, enum: ['Active', 'Deferred', 'Completed'], default: 'Active' },
+  archived: { type: Boolean, default: false },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
@@ -182,8 +183,38 @@ const interviewQuestionSchema = new mongoose.Schema({
   updated_at: { type: Date, default: Date.now }
 });
 
+const interviewQuestionSetSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  description: { type: String, default: '' },
+  part_a_question_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'InterviewQuestion' }],
+  part_b_question_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'InterviewQuestion' }],
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now }
+});
+
+const interviewSetRunSchema = new mongoose.Schema({
+  set_id: { type: mongoose.Schema.Types.ObjectId, ref: 'InterviewQuestionSet', required: true },
+  candidate_name: { type: String, required: true },
+  interview_at: { type: Date, required: true },
+  status: { type: String, enum: ['In Progress', 'Completed'], default: 'In Progress' },
+  answers: [{
+    question_id: { type: mongoose.Schema.Types.ObjectId, ref: 'InterviewQuestion', required: true },
+    part: { type: String, enum: ['A', 'B'], required: true },
+    rating: { type: String, enum: ['Good', 'Acceptable', 'Below Average', 'Wrong Answered', 'No Answer'], default: null },
+    comment: { type: String, default: '' },
+    skipped: { type: Boolean, default: false },
+    updated_at: { type: Date, default: Date.now }
+  }],
+  final_comment: { type: String, default: '' },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now },
+  completed_at: { type: Date, default: null }
+});
+
 export const QuestionCategory = mongoose.model('QuestionCategory', questionCategorySchema);
 export const InterviewQuestion = mongoose.model('InterviewQuestion', interviewQuestionSchema);
+export const InterviewQuestionSet = mongoose.model('InterviewQuestionSet', interviewQuestionSetSchema);
+export const InterviewSetRun = mongoose.model('InterviewSetRun', interviewSetRunSchema);
 
 // Requirements module
 const requirementSchema = new mongoose.Schema({

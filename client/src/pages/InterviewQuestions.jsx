@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Plus, X, Trash2, Edit, Info, Search } from 'lucide-react';
+import { Plus, Trash2, Edit, Search, Play, CheckCircle2 } from 'lucide-react';
 import Dialog, { ConfirmDialog } from '../components/Dialog';
 
 export default function InterviewQuestions() {
@@ -27,6 +27,26 @@ export default function InterviewQuestions() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkError, setBulkError] = useState('');
   const [bulkDefaultDiff, setBulkDefaultDiff] = useState('Low');
+  const [viewMode, setViewMode] = useState('questions');
+
+  const [questionPool, setQuestionPool] = useState([]);
+  const [sets, setSets] = useState([]);
+  const [setsLoading, setSetsLoading] = useState(false);
+  const [setDialogOpen, setSetDialogOpen] = useState(false);
+  const [questionSetForm, setQuestionSetForm] = useState({ id: '', name: '', description: '', questionParts: {} });
+  const [setSkillFilter, setSetSkillFilter] = useState('');
+  const [setDeleteConfirm, setSetDeleteConfirm] = useState({ open: false, id: null, force: false, error: '' });
+  const [executeMetaOpen, setExecuteMetaOpen] = useState(false);
+  const [executingSet, setExecutingSet] = useState(null);
+  const [executeForm, setExecuteForm] = useState({ candidate_name: '', interview_at: '' });
+
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [runData, setRunData] = useState(null);
+  const [runCategoryFilter, setRunCategoryFilter] = useState('');
+  const [runSavingQuestionId, setRunSavingQuestionId] = useState('');
+  const [collapseAll, setCollapseAll] = useState(false);
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [finalComment, setFinalComment] = useState('');
 
   const difficulties = ['Low', 'Medium', 'High'];
 
@@ -45,6 +65,11 @@ export default function InterviewQuestions() {
   useEffect(() => {
     fetchQuestions();
   }, [page, limit, categoryFilter, search, diffFilter]);
+
+  useEffect(() => {
+    loadQuestionPool();
+    loadSets();
+  }, []);
 
   useEffect(() => {
     // live parse bulk text
@@ -74,6 +99,152 @@ export default function InterviewQuestions() {
       const res = await axios.get('/api/skills');
       setCategories(res.data || []);
     } catch { }
+  };
+
+  const loadQuestionPool = async () => {
+    try {
+      const res = await axios.get('/api/interview-questions', { params: { page: 1, limit: 10000 } });
+      setQuestionPool(res.data?.data || []);
+    } catch {
+      setQuestionPool([]);
+    }
+  };
+
+  const openAddSet = () => {
+    setQuestionSetForm({ id: '', name: '', description: '', questionParts: {} });
+    setSetDialogOpen(true);
+  };
+
+  const openEditSet = (setObj) => {
+    const parts = {};
+    (setObj.part_a_question_ids || []).forEach(qid => { parts[String(qid)] = 'A'; });
+    (setObj.part_b_question_ids || []).forEach(qid => { parts[String(qid)] = 'B'; });
+    setQuestionSetForm({
+      id: setObj.id,
+      name: setObj.name || '',
+      description: setObj.description || '',
+      questionParts: parts
+    });
+    setSetDialogOpen(true);
+  };
+
+  const saveSet = async () => {
+    const name = questionSetForm.name.trim();
+    if (!name) return;
+
+    const entries = Object.entries(questionSetForm.questionParts || {});
+    const partA = entries.filter(([, part]) => part === 'A').map(([id]) => id);
+    const partB = entries.filter(([, part]) => part === 'B').map(([id]) => id);
+    if (partA.length + partB.length === 0) return;
+
+    const payload = {
+      name,
+      description: questionSetForm.description.trim(),
+      part_a_question_ids: partA,
+      part_b_question_ids: partB
+    };
+
+    if (questionSetForm.id) await axios.put(`/api/interview-questions/sets/${questionSetForm.id}`, payload);
+    else await axios.post('/api/interview-questions/sets', payload);
+
+    setSetDialogOpen(false);
+    await loadSets();
+  };
+
+  const deleteSet = async (id, force = false) => {
+    try {
+      await axios.delete(`/api/interview-questions/sets/${id}`, { params: { force } });
+      setSetDeleteConfirm({ open: false, id: null, force: false, error: '' });
+      await loadSets();
+      return true; // signal success to ConfirmDialog for closing
+    } catch (e) {
+      const status = e?.response?.status;
+      const msg = e?.response?.data?.error || 'Failed to delete set';
+      if (status === 409 && !force) {
+        setSetDeleteConfirm(prev => ({ ...prev, error: `${msg}. You can force delete to remove set and all related runs.` }));
+      } else {
+        setSetDeleteConfirm(prev => ({ ...prev, error: msg }));
+      }
+      return false; // keep dialog open
+    }
+  };
+
+  const openExecuteMeta = (setObj) => {
+    setExecutingSet(setObj);
+    const now = new Date();
+    const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    setExecuteForm({ candidate_name: '', interview_at: localISO });
+    setExecuteMetaOpen(true);
+  };
+
+  const startExecution = async () => {
+    if (!executingSet?.id) return;
+    if (!executeForm.candidate_name.trim() || !executeForm.interview_at) return;
+    const run = await axios.post(`/api/interview-questions/sets/${executingSet.id}/execute`, {
+      candidate_name: executeForm.candidate_name.trim(),
+      interview_at: executeForm.interview_at
+    });
+    setExecuteMetaOpen(false);
+    await loadRun(run.data.id || run.data._id);
+    setRunDialogOpen(true);
+  };
+
+  const loadRun = async (runId) => {
+    const res = await axios.get(`/api/interview-questions/runs/${runId}`);
+    setRunData(res.data);
+    setRunCategoryFilter('');
+  };
+
+  const saveRunAnswer = async (questionId, patch) => {
+    if (!runData?.id) return;
+    setRunSavingQuestionId(String(questionId));
+    const updatedQuestions = (runData.questions || []).map(q => {
+      if (String(q.id) !== String(questionId)) return q;
+      return {
+        ...q,
+        ...patch,
+        answered: (patch.skipped ?? q.skipped) || !!(patch.rating ?? q.rating)
+      };
+    });
+    setRunData(prev => ({ ...prev, questions: updatedQuestions }));
+
+    await axios.put(`/api/interview-questions/runs/${runData.id}/answers`, {
+      question_id: questionId,
+      rating: patch.rating ?? null,
+      comment: patch.comment ?? '',
+      skipped: patch.skipped ?? false
+    });
+    setRunSavingQuestionId('');
+  };
+
+  const completeRun = async () => {
+    if (!runData?.id) return;
+    await axios.put(`/api/interview-questions/runs/${runData.id}/complete`, { final_comment: finalComment || '' });
+    setCompleteDialogOpen(false);
+    setRunDialogOpen(false);
+    setRunData(null);
+    setFinalComment('');
+  };
+
+  const filteredRunQuestions = useMemo(() => {
+    const list = runData?.questions || [];
+    if (!runCategoryFilter) return list;
+    return list.filter(q => {
+      const catId = typeof q.category_id === 'object' ? q.category_id.id : q.category_id;
+      return String(catId || '') === String(runCategoryFilter);
+    });
+  }, [runData, runCategoryFilter]);
+
+  const loadSets = async () => {
+    try {
+      setSetsLoading(true);
+      const res = await axios.get('/api/interview-questions/sets');
+      setSets(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setSets([]);
+    } finally {
+      setSetsLoading(false);
+    }
   };
 
   const buildCategoryMap = async () => {
@@ -166,6 +337,12 @@ export default function InterviewQuestions() {
     return found?.name || '';
   };
 
+  const getQuestionCategoryId = (q) => {
+    if (!q?.category_id) return '';
+    if (typeof q.category_id === 'object') return q.category_id.id || q.category_id._id || '';
+    return q.category_id;
+  };
+
   const exportCSV = async () => {
     try {
       setExporting(true);
@@ -208,43 +385,70 @@ export default function InterviewQuestions() {
         <div className="p-4 border-b border-gray-800 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-cyan-400">Interview Questions</h2>
-            <span className="text-xs text-gray-500">{totalRecords} total</span>
+            <span className="text-xs text-gray-500">{viewMode === 'questions' ? `${totalRecords} total` : `${sets.length} sets`}</span>
+            <div className="ml-2 flex items-center gap-1 bg-gray-900 border border-gray-800 rounded p-1">
+              <button
+                onClick={() => setViewMode('questions')}
+                className={`px-2 py-1 text-xs rounded ${viewMode === 'questions' ? 'bg-cyan-600/20 text-cyan-300' : 'text-gray-400 hover:text-gray-200'}`}
+              >
+                Questions
+              </button>
+              <button
+                onClick={() => setViewMode('sets')}
+                className={`px-2 py-1 text-xs rounded ${viewMode === 'sets' ? 'bg-cyan-600/20 text-cyan-300' : 'text-gray-400 hover:text-gray-200'}`}
+              >
+                Sets
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search question..." className="pl-7 pr-3 py-2 bg-gray-900 border border-gray-800 rounded text-sm focus:outline-none focus:border-cyan-600" />
-            </div>
-            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600">
-              <option value="">All skills</option>
-              {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <div className="flex items-center gap-1">
-              {['', 'Low', 'Medium', 'High'].map(d => (
-                <button key={d || 'All'} onClick={() => { setDiffFilter(d); setPage(1); }} className={`px-2 py-1 rounded text-xs border ${diffFilter === d ? 'bg-cyan-600/20 border-cyan-600 text-cyan-300' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
-                  {d || 'All'}
+            {viewMode === 'questions' ? (
+              <>
+                <div className="relative">
+                  <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search question..." className="pl-7 pr-3 py-2 bg-gray-900 border border-gray-800 rounded text-sm focus:outline-none focus:border-cyan-600" />
+                </div>
+                <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1); }} className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600">
+                  <option value="">All skills</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-1">
+                  {['', 'Low', 'Medium', 'High'].map(d => (
+                    <button key={d || 'All'} onClick={() => { setDiffFilter(d); setPage(1); }} className={`px-2 py-1 rounded text-xs border ${diffFilter === d ? 'bg-cyan-600/20 border-cyan-600 text-cyan-300' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                      {d || 'All'}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={openAdd} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1">
+                  <Plus size={14} /> Add Question
                 </button>
-              ))}
-            </div>
-            <button onClick={openAdd} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1">
-              <Plus size={14} /> Add Question
-            </button>
-            <button onClick={() => setBulkOpen(true)} className="px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-700/40 rounded text-xs transition">
-              Bulk add
-            </button>
-            <button onClick={exportCSV} disabled={exporting} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs transition">
-              {exporting ? 'Exporting…' : 'Export (Excel)'}
-            </button>
+                <button onClick={() => setBulkOpen(true)} className="px-3 py-1.5 bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-700/40 rounded text-xs transition">
+                  Bulk add
+                </button>
+                <button onClick={exportCSV} disabled={exporting} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs transition">
+                  {exporting ? 'Exporting…' : 'Export (Excel)'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={loadSets} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs transition">
+                  Refresh
+                </button>
+                <button onClick={openAddSet} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs transition flex items-center gap-1">
+                  <Plus size={14} /> Create Set
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {/* Category add removed: manage in Masters > Skills */}
 
-        {loading ? (
+        {viewMode === 'questions' && loading ? (
           <div className="flex items-center justify-center py-12 text-gray-400">Loading...</div>
-        ) : (
+        ) : viewMode === 'questions' ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-900">
@@ -274,15 +478,52 @@ export default function InterviewQuestions() {
               </tbody>
             </table>
           </div>
+        ) : setsLoading ? (
+          <div className="flex items-center justify-center py-12 text-gray-400">Loading sets...</div>
+        ) : sets.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-gray-500">No sets created yet</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-900">
+                <tr className="text-left text-xs text-gray-500">
+                  <th className="px-3 py-2 font-semibold">Set Name</th>
+                  <th className="px-3 py-2 font-semibold">Description</th>
+                  <th className="px-3 py-2 font-semibold">Questions</th>
+                  <th className="px-3 py-2 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {sets.map(s => (
+                  <tr key={s.id} className="hover:bg-gray-900 transition">
+                    <td className="px-3 py-2 text-gray-200 font-medium">{s.name}</td>
+                    <td className="px-3 py-2 text-gray-400">{s.description || '-'}</td>
+                    <td className="px-3 py-2 text-gray-300 text-xs">
+                      Part A: {(s.part_a_question_ids || []).length} • Part B: {(s.part_b_question_ids || []).length}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1.5 items-center">
+                        <button onClick={() => openExecuteMeta(s)} className="text-emerald-400 hover:text-emerald-300" title="Execute Set"><Play size={16} /></button>
+                        <button onClick={() => openEditSet(s)} className="text-gray-500 hover:text-white" title="Edit"><Edit size={16} /></button>
+                        <button onClick={() => setSetDeleteConfirm({ open: true, id: s.id, force: false, error: '' })} className="text-gray-500 hover:text-red-400" title="Delete"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
 
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800 text-sm text-gray-400">
-          <span>Page {page} of {totalPages}</span>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+        {viewMode === 'questions' && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-800 text-sm text-gray-400">
+            <span>Page {page} of {totalPages}</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed">Prev</button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <Dialog isOpen={addEditOpen} onClose={() => setAddEditOpen(false)} title={`${form.id ? 'Edit' : 'Add'} Question`}>
@@ -393,6 +634,258 @@ export default function InterviewQuestions() {
         </div>
         {bulkError ? <div className="mt-2 text-xs text-red-400">{bulkError}</div> : null}
       </Dialog>
+
+      <Dialog isOpen={setDialogOpen} onClose={() => setSetDialogOpen(false)} title={`${questionSetForm.id ? 'Edit' : 'Create'} Question Set`} size="xl">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm mb-1">Set Name</label>
+            <input
+              value={questionSetForm.name}
+              onChange={(e) => setQuestionSetForm(prev => ({ ...prev, name: e.target.value }))}
+              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+              placeholder="e.g., Java Backend Round 1"
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Description</label>
+            <input
+              value={questionSetForm.description}
+              onChange={(e) => setQuestionSetForm(prev => ({ ...prev, description: e.target.value }))}
+              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+              placeholder="Optional"
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <label className="block text-sm">Assign questions to Part A / Part B</label>
+            <select
+              value={setSkillFilter}
+              onChange={(e) => setSetSkillFilter(e.target.value)}
+              className="bg-gray-900 border border-gray-800 rounded px-3 py-2 text-xs focus:outline-none focus:border-cyan-600"
+            >
+              <option value="">All skills</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="max-h-80 overflow-auto border border-gray-800 rounded">
+            <table className="w-full text-xs">
+              <thead className="bg-gray-900 sticky top-0">
+                <tr className="text-left text-gray-500">
+                  <th className="px-3 py-2">Question</th>
+                  <th className="px-3 py-2">Skill</th>
+                  <th className="px-3 py-2">Part</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-800">
+                {questionPool
+                  .filter(q => !setSkillFilter || String(getQuestionCategoryId(q)) === String(catMap[setSkillFilter]))
+                  .map(q => {
+                    const part = questionSetForm.questionParts[String(q.id)] || '';
+                    return (
+                      <tr key={q.id}>
+                        <td className="px-3 py-2 text-gray-200">{q.question_text}</td>
+                        <td className="px-3 py-2 text-gray-400">{getCategoryName(q)}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex gap-1">
+                            {['', 'A', 'B'].map(opt => (
+                              <button
+                                key={opt || 'none'}
+                                type="button"
+                                onClick={() => {
+                                  const key = String(q.id);
+                                  setQuestionSetForm(prev => {
+                                    const next = { ...(prev.questionParts || {}) };
+                                    if (!opt) delete next[key];
+                                    else next[key] = opt;
+                                    return { ...prev, questionParts: next };
+                                  });
+                                }}
+                                className={`px-2 py-1 rounded border ${part === opt ? 'bg-cyan-600/20 border-cyan-600 text-cyan-300' : 'bg-gray-900 border-gray-700 text-gray-400'}`}
+                              >
+                                {opt || 'None'}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={() => setSetDialogOpen(false)} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs">Cancel</button>
+          <button onClick={saveSet} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs">{questionSetForm.id ? 'Update Set' : 'Create Set'}</button>
+        </div>
+      </Dialog>
+
+      <Dialog isOpen={executeMetaOpen} onClose={() => setExecuteMetaOpen(false)} title={`Execute Set${executingSet?.name ? `: ${executingSet.name}` : ''}`}>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm mb-1">Candidate Name</label>
+            <input
+              value={executeForm.candidate_name}
+              onChange={(e) => setExecuteForm(prev => ({ ...prev, candidate_name: e.target.value }))}
+              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Interview Date & Time</label>
+            <input
+              type="datetime-local"
+              value={executeForm.interview_at}
+              onChange={(e) => setExecuteForm(prev => ({ ...prev, interview_at: e.target.value }))}
+              className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+            />
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={() => setExecuteMetaOpen(false)} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs">Cancel</button>
+          <button onClick={startExecution} className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 rounded text-xs">Start</button>
+        </div>
+      </Dialog>
+
+      <Dialog isOpen={runDialogOpen} onClose={() => setRunDialogOpen(false)} title={runData ? `Run: ${runData?.candidate_name || ''}` : 'Run Set'} size="xl">
+        {!runData ? (
+          <div className="py-8 text-center text-gray-500 text-sm">Loading run...</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] text-gray-400 space-x-3">
+                <span>Set: {runData?.set?.name || '-'}</span>
+                <span>Candidate: {runData?.candidate_name || '-'}</span>
+                <span>Status: {runData?.status || '-'}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <input type="checkbox" checked={collapseAll} onChange={(e) => setCollapseAll(e.target.checked)} />
+                  <span>Collapse all</span>
+                </label>
+                <select
+                  value={runCategoryFilter}
+                  onChange={(e) => setRunCategoryFilter(e.target.value)}
+                  className="bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-[11px] focus:outline-none focus:border-cyan-600"
+                >
+                  <option value="">All categories</option>
+                  {Array.from(new Map((runData?.questions || []).map(q => {
+                    const cid = getQuestionCategoryId(q);
+                    const cname = getCategoryName(q) || 'Unknown';
+                    return [String(cid), { id: String(cid), name: cname }];
+                  })).values()).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="max-h-[70vh] overflow-y-auto border border-gray-800 rounded p-2 space-y-2">
+              {filteredRunQuestions.map((q, idx) => (
+                <div key={q.id} className="border border-gray-800 rounded p-2 bg-gray-950">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div>
+                      <div className="text-[11px] text-gray-500 mb-0.5">Q{idx + 1} • Part {q.part} • {getCategoryName(q)}</div>
+                      <div className="text-sm text-gray-200 leading-snug">{q.question_text}</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {q.answered && <CheckCircle2 size={14} className="text-green-400" />}
+                      {runSavingQuestionId === String(q.id) && <span className="text-[10px] text-gray-500">Saving...</span>}
+                    </div>
+                  </div>
+
+                  {!collapseAll && (
+                    <>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {(runData.rating_options || []).map(opt => (
+                          <label key={opt} className={`text-[11px] px-2 py-0.5 rounded border cursor-pointer ${q.rating === opt && !q.skipped ? 'bg-cyan-600/20 border-cyan-600 text-cyan-300' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                            <input
+                              type="radio"
+                              name={`rating-${q.id}`}
+                              checked={q.rating === opt && !q.skipped}
+                              onChange={() => saveRunAnswer(q.id, { rating: opt, skipped: false, comment: q.comment || '' })}
+                              className="hidden"
+                            />
+                            {opt}
+                          </label>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => saveRunAnswer(q.id, { skipped: !q.skipped, rating: null, comment: q.comment || '' })}
+                          className={`text-[11px] px-2 py-0.5 rounded border ${q.skipped ? 'bg-yellow-600/20 border-yellow-600 text-yellow-300' : 'bg-gray-900 border-gray-700 text-gray-400'}`}
+                        >
+                          {q.skipped ? 'Skipped' : 'Skip'}
+                        </button>
+                      </div>
+
+                      <div className="mt-1">
+                        <textarea
+                          rows={2}
+                          value={q.comment || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setRunData(prev => ({
+                              ...prev,
+                              questions: (prev.questions || []).map(item => String(item.id) === String(q.id) ? { ...item, comment: val } : item)
+                            }));
+                          }}
+                          onBlur={(e) => saveRunAnswer(q.id, { rating: q.skipped ? null : q.rating, skipped: q.skipped, comment: e.target.value })}
+                          placeholder="Optional comment"
+                          className="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-[11px] focus:outline-none focus:border-cyan-600"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setRunDialogOpen(false)} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs">Close</button>
+              <button onClick={() => setCompleteDialogOpen(true)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-xs">Complete</button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      <Dialog isOpen={completeDialogOpen} onClose={() => setCompleteDialogOpen(false)} title="Complete Interview Run">
+        <div>
+          <label className="block text-sm mb-1">Final comments (optional)</label>
+          <textarea
+            rows={4}
+            value={finalComment}
+            onChange={(e) => setFinalComment(e.target.value)}
+            className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-cyan-600"
+            placeholder="Any final observation, candidate questions, etc."
+          />
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={() => setCompleteDialogOpen(false)} className="px-3 py-1.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 rounded text-xs">Cancel</button>
+          <button onClick={completeRun} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 rounded text-xs">Mark Complete</button>
+        </div>
+      </Dialog>
+
+      <ConfirmDialog
+        isOpen={setDeleteConfirm.open}
+        onClose={() => setSetDeleteConfirm({ open: false, id: null, force: false, error: '' })}
+        onConfirm={() => deleteSet(setDeleteConfirm.id, setDeleteConfirm.force)}
+        title="Delete Set?"
+        message={
+          <div className="space-y-3">
+            <p>Are you sure you want to delete this set? This cannot be undone.</p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={!!setDeleteConfirm.force}
+                onChange={(e) => setSetDeleteConfirm(prev => ({ ...prev, force: e.target.checked }))}
+              />
+              <span>Force delete (also deletes all runs for this set)</span>
+            </label>
+            {setDeleteConfirm.error ? (
+              <div className="text-xs text-red-400">{setDeleteConfirm.error}</div>
+            ) : null}
+          </div>
+        }
+        confirmText={setDeleteConfirm.force ? 'Force Delete' : 'Delete'}
+        type="danger"
+        autoCloseOnConfirm={false}
+      />
     </div>
   );
 }

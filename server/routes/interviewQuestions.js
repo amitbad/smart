@@ -3,6 +3,12 @@ import { getDB, getDBType } from '../db/index.js';
 import pool from '../config/database.js';
 
 const router = express.Router();
+const ANSWER_RATINGS = ['Good', 'Acceptable', 'Below Average', 'Wrong Answered', 'No Answer'];
+
+const toUniqueIds = (arr = []) => {
+  const ids = Array.isArray(arr) ? arr.map(v => String(v)).filter(Boolean) : [];
+  return Array.from(new Set(ids));
+};
 
 // Categories CRUD (simple: list, create)
 router.get('/categories', async (req, res) => {
@@ -17,6 +23,290 @@ router.get('/categories', async (req, res) => {
     res.json(result.rows);
   } catch (e) {
     res.status(500).json({ error: 'Failed to load categories' });
+  }
+});
+
+// Question Sets CRUD
+router.get('/sets', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question sets are currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const db = getDB();
+    const sets = await db.findAll('interviewQuestionSets', {}, { sort: { created_at: -1 } });
+    const payload = sets.map(s => ({
+      ...s,
+      question_count: (s.part_a_question_ids?.length || 0) + (s.part_b_question_ids?.length || 0)
+    }));
+    return res.json(payload);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load sets' });
+  }
+});
+
+router.post('/sets', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question sets are currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { name, description = '', part_a_question_ids = [], part_b_question_ids = [] } = req.body || {};
+    if (!String(name || '').trim()) return res.status(400).json({ error: 'Set name is required' });
+
+    const aIds = toUniqueIds(part_a_question_ids);
+    const bIds = toUniqueIds(part_b_question_ids);
+
+    if (aIds.length + bIds.length === 0) {
+      return res.status(400).json({ error: 'Select at least one question in Part A or Part B' });
+    }
+
+    const db = getDB();
+    const created = await db.create('interviewQuestionSets', {
+      name: String(name).trim(),
+      description: String(description || '').trim(),
+      part_a_question_ids: aIds,
+      part_b_question_ids: bIds,
+      created_at: new Date(),
+      updated_at: new Date()
+    });
+    return res.status(201).json(created);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to create set' });
+  }
+});
+
+router.put('/sets/:id', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question sets are currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { id } = req.params;
+    const { name, description = '', part_a_question_ids = [], part_b_question_ids = [] } = req.body || {};
+    if (!String(name || '').trim()) return res.status(400).json({ error: 'Set name is required' });
+
+    const aIds = toUniqueIds(part_a_question_ids);
+    const bIds = toUniqueIds(part_b_question_ids);
+
+    if (aIds.length + bIds.length === 0) {
+      return res.status(400).json({ error: 'Select at least one question in Part A or Part B' });
+    }
+
+    const db = getDB();
+    const updated = await db.update('interviewQuestionSets', id, {
+      name: String(name).trim(),
+      description: String(description || '').trim(),
+      part_a_question_ids: aIds,
+      part_b_question_ids: bIds,
+      updated_at: new Date()
+    });
+    if (!updated) return res.status(404).json({ error: 'Set not found' });
+    return res.json(updated);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to update set' });
+  }
+});
+
+router.delete('/sets/:id', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question sets are currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { id } = req.params;
+    const force = String(req.query.force || '').toLowerCase() === 'true';
+    const db = getDB();
+    const activeRuns = await db.count('interviewSetRuns', { set_id: id, status: 'In Progress' });
+    if (activeRuns > 0 && !force) {
+      return res.status(409).json({ error: 'Cannot delete set with active interview runs' });
+    }
+
+    if (force) {
+      // Cascade delete all runs (in-progress and completed) for this set
+      await db.deleteMany('interviewSetRuns', { set_id: id });
+    }
+    const deleted = await db.delete('interviewQuestionSets', id);
+    if (!deleted) return res.status(404).json({ error: 'Set not found' });
+    return res.json({ message: force ? 'Set and all related runs deleted' : 'Set deleted' });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to delete set' });
+  }
+});
+
+// Execute a set (create a run)
+router.post('/sets/:id/execute', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question set execution is currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { id } = req.params;
+    const { candidate_name, interview_at } = req.body || {};
+    if (!String(candidate_name || '').trim()) return res.status(400).json({ error: 'Candidate name is required' });
+    if (!interview_at) return res.status(400).json({ error: 'Interview date/time is required' });
+
+    const db = getDB();
+    const setDoc = await db.findById('interviewQuestionSets', id);
+    if (!setDoc) return res.status(404).json({ error: 'Set not found' });
+
+    const answers = [
+      ...(setDoc.part_a_question_ids || []).map(qid => ({ question_id: qid, part: 'A', rating: null, comment: '', skipped: false, updated_at: new Date() })),
+      ...(setDoc.part_b_question_ids || []).map(qid => ({ question_id: qid, part: 'B', rating: null, comment: '', skipped: false, updated_at: new Date() }))
+    ];
+
+    const run = await db.create('interviewSetRuns', {
+      set_id: id,
+      candidate_name: String(candidate_name).trim(),
+      interview_at: new Date(interview_at),
+      status: 'In Progress',
+      answers,
+      final_comment: '',
+      created_at: new Date(),
+      updated_at: new Date(),
+      completed_at: null
+    });
+
+    return res.status(201).json(run);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to execute set' });
+  }
+});
+
+// Get a run with merged question details
+router.get('/runs/:id', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question set execution is currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { id } = req.params;
+    const db = getDB();
+    const run = await db.findById('interviewSetRuns', id);
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+
+    const setDoc = await db.findById('interviewQuestionSets', run.set_id);
+    if (!setDoc) return res.status(404).json({ error: 'Set not found for this run' });
+
+    const questionIds = toUniqueIds([
+      ...(setDoc.part_a_question_ids || []),
+      ...(setDoc.part_b_question_ids || [])
+    ]);
+
+    const questions = await db.findAll('interviewQuestions', { _id: { $in: questionIds } }, {
+      populate: ['category_id']
+    });
+    const qMap = new Map(questions.map(q => [String(q.id || q._id), q]));
+    const ansMap = new Map((run.answers || []).map(a => [String(a.question_id), a]));
+
+    const mergedQuestions = questionIds
+      .map(qid => {
+        const q = qMap.get(String(qid));
+        if (!q) return null;
+        const ans = ansMap.get(String(qid));
+        return {
+          id: q.id || q._id,
+          question_text: q.question_text,
+          difficulty: q.difficulty,
+          category_id: q.category_id,
+          part: ans?.part || (setDoc.part_a_question_ids?.some(v => String(v) === String(qid)) ? 'A' : 'B'),
+          rating: ans?.rating || null,
+          comment: ans?.comment || '',
+          skipped: !!ans?.skipped,
+          answered: !!ans?.rating || !!ans?.skipped
+        };
+      })
+      .filter(Boolean);
+
+    return res.json({
+      ...run,
+      set: setDoc,
+      questions: mergedQuestions,
+      rating_options: ANSWER_RATINGS
+    });
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to load run' });
+  }
+});
+
+// Autosave/update an answer
+router.put('/runs/:id/answers', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question set execution is currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { id } = req.params;
+    const { question_id, rating = null, comment = '', skipped = false } = req.body || {};
+    if (!question_id) return res.status(400).json({ error: 'question_id is required' });
+    if (rating && !ANSWER_RATINGS.includes(rating)) return res.status(400).json({ error: 'Invalid rating value' });
+
+    const db = getDB();
+    const run = await db.findById('interviewSetRuns', id);
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+    if (run.status === 'Completed') return res.status(400).json({ error: 'Run already completed' });
+
+    const setDoc = await db.findById('interviewQuestionSets', run.set_id);
+    if (!setDoc) return res.status(404).json({ error: 'Set not found for this run' });
+
+    const inPartA = (setDoc.part_a_question_ids || []).some(v => String(v) === String(question_id));
+    const inPartB = (setDoc.part_b_question_ids || []).some(v => String(v) === String(question_id));
+    if (!inPartA && !inPartB) return res.status(400).json({ error: 'Question is not part of this set' });
+
+    const nextAnswers = Array.isArray(run.answers) ? [...run.answers] : [];
+    const idx = nextAnswers.findIndex(a => String(a.question_id) === String(question_id));
+    const next = {
+      question_id,
+      part: inPartA ? 'A' : 'B',
+      rating: skipped ? null : (rating || null),
+      comment: String(comment || ''),
+      skipped: !!skipped,
+      updated_at: new Date()
+    };
+
+    if (idx >= 0) nextAnswers[idx] = { ...nextAnswers[idx], ...next };
+    else nextAnswers.push(next);
+
+    const updated = await db.update('interviewSetRuns', id, {
+      answers: nextAnswers,
+      updated_at: new Date()
+    });
+    return res.json(updated);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to autosave answer' });
+  }
+});
+
+// Complete a run
+router.put('/runs/:id/complete', async (req, res) => {
+  try {
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Question set execution is currently implemented for MongoDB. For PostgreSQL, please add interview_question_sets and interview_set_runs tables.' });
+    }
+
+    const { id } = req.params;
+    const { final_comment = '' } = req.body || {};
+    const db = getDB();
+    const run = await db.findById('interviewSetRuns', id);
+    if (!run) return res.status(404).json({ error: 'Run not found' });
+
+    const updated = await db.update('interviewSetRuns', id, {
+      status: 'Completed',
+      final_comment: String(final_comment || ''),
+      completed_at: new Date(),
+      updated_at: new Date()
+    });
+    return res.json(updated);
+  } catch (e) {
+    return res.status(500).json({ error: 'Failed to complete run' });
   }
 });
 

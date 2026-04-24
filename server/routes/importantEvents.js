@@ -6,13 +6,15 @@ const router = express.Router();
 
 router.get('/', async (req, res) => {
   try {
-    const { status, source, activeOnly } = req.query;
+    const { status, source, activeOnly, archived } = req.query;
     const db = getDB();
     const dbType = getDBType();
 
     let filter = {};
     if (status) filter.status = status;
     if (source) filter.source = source;
+    if (archived === 'true') filter.archived = true;
+    if (archived === 'false') filter.archived = { $ne: true };
 
     if (activeOnly === 'true') {
       filter.status = 'Active';
@@ -34,6 +36,25 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('Error fetching important events:', error);
     res.status(500).json({ error: 'Failed to fetch important events' });
+  }
+});
+
+// Toggle archive state for an event
+router.put('/:id/archive', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { archived = true } = req.body || {};
+    const db = getDB();
+    const dbType = getDBType();
+    if (dbType !== 'Mongo') {
+      return res.status(501).json({ error: 'Important Events currently support MongoDB path in this route' });
+    }
+    const updated = await db.update('importantEvents', id, { archived: !!archived, updated_at: new Date() });
+    if (!updated) return res.status(404).json({ error: 'Event not found' });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error archiving important event:', error);
+    res.status(500).json({ error: 'Failed to archive important event' });
   }
 });
 
